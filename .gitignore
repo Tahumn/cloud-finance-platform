@@ -1,0 +1,57 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Env
+.env
+
+# Test
+.pytest_cache/
+
+# IDE
+.vscode/
+
+# Codex / local agent artifacts
+.agent/
+.codex
+.codex/
+
+# Local scratch kits
+temp-kit/
+
+# Vite cache
+frontend/.vite/
+
+# Docker volumes
+data/
+# Node
+node_modules/
+npm-debug.log*
+
+# Expo
+.expo/
+.expo-shared/
+
+# Build
+dist/
+build/
+
+# Environment
+.env
+.env.example/
+
+# Temporary development files
+TransactionsScreen_local.jsx
+TransactionsScreen_local_utf8.jsx
+TransactionsScreen_remote.jsx
+TransactionsScreen_remote_utf8.jsx
+diff.txt
+docker-compose (1).yml
+phan_cong_copy.docx
+scratch/
+
+# Runtime uploads
+uploads/*
+!uploads/.gitkeep
