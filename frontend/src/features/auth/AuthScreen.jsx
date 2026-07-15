@@ -13,12 +13,15 @@ const strengthLabel = (score) => {
   return t("auth.password_strength_strong");
 };
 
-function Logo({ size = 32 }) {
+/* ─── SVG Icons ─────────────────────────────────────────────── */
+
+function FinovaLogo({ size = 32 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#F9206B" />
-      <path d="M2 17L12 22L22 17" stroke="#F9206B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M2 12L12 17L22 12" stroke="#F9206B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="10" fill="#C0392B"/>
+      <path d="M14 28V16l6-4 6 4v12" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M18 28v-6h4v6" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M11 28h18" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -101,6 +104,86 @@ function SecurityIcon() {
   );
 }
 
+function GoogleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/>
+      <path d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/>
+      <path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/>
+      <path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/>
+    </svg>
+  );
+}
+
+/* ─── Hero Illustration (Minimalist red landscape) ───────────── */
+function HeroIllustration() {
+  return (
+    <svg viewBox="0 0 480 280" fill="none" xmlns="http://www.w3.org/2000/svg" className="auth-hero-illustration">
+      {/* Sky */}
+      <rect width="480" height="280" rx="20" fill="#FFF5F5"/>
+      {/* Birds */}
+      <path d="M340 55 Q346 50 352 55" stroke="#C0392B" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+      <path d="M360 42 Q367 36 374 42" stroke="#C0392B" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+      <path d="M390 60 Q395 55 401 60" stroke="#E57373" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+      {/* Far mountains - lightest */}
+      <ellipse cx="380" cy="165" rx="160" ry="65" fill="#FECDD3"/>
+      <ellipse cx="120" cy="170" rx="140" ry="60" fill="#FECDD3"/>
+      {/* Mid mountains */}
+      <path d="M0 200 Q80 140 160 180 Q240 140 320 170 Q380 130 480 165 L480 280 L0 280 Z" fill="#F87171" opacity="0.55"/>
+      {/* Reflective water */}
+      <ellipse cx="240" cy="242" rx="220" ry="28" fill="#FCA5A5" opacity="0.35"/>
+      {/* Ground platform */}
+      <ellipse cx="240" cy="262" rx="180" ry="22" fill="#EF4444" opacity="0.25"/>
+      {/* Pedestal */}
+      <ellipse cx="240" cy="252" rx="52" ry="14" fill="#DC2626" opacity="0.7"/>
+      <rect x="218" y="218" width="44" height="36" rx="8" fill="#DC2626" opacity="0.85"/>
+      <ellipse cx="240" cy="218" rx="22" ry="7" fill="#EF4444"/>
+      {/* Vase */}
+      <ellipse cx="240" cy="212" rx="16" ry="9" fill="#F8F8F6"/>
+      <path d="M228 212 Q226 198 232 192 Q240 186 248 192 Q254 198 252 212 Z" fill="#F8F8F6"/>
+      {/* Plant stem */}
+      <path d="M240 192 Q240 175 240 160" stroke="#C0392B" strokeWidth="2.5" strokeLinecap="round"/>
+      {/* Leaves */}
+      <path d="M240 175 Q228 165 222 155 Q232 160 240 170" fill="#C0392B"/>
+      <path d="M240 168 Q252 158 258 148 Q248 155 240 165" fill="#C0392B"/>
+      <path d="M240 182 Q225 174 218 162 Q230 168 240 178" fill="#DC2626"/>
+      <path d="M240 178 Q255 170 262 158 Q250 164 240 174" fill="#DC2626"/>
+      <path d="M240 190 Q230 183 226 174 Q234 180 240 188" fill="#E57373"/>
+      <path d="M240 187 Q250 180 254 171 Q246 177 240 185" fill="#E57373"/>
+      {/* Water ripples */}
+      <ellipse cx="240" cy="265" rx="100" ry="6" fill="none" stroke="#FCA5A5" strokeWidth="1" opacity="0.5"/>
+      <ellipse cx="240" cy="270" rx="140" ry="6" fill="none" stroke="#FCA5A5" strokeWidth="1" opacity="0.35"/>
+    </svg>
+  );
+}
+
+/* ─── Feature icons ──────────────────────────────────────────── */
+function ChartIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  );
+}
+
+function PlanIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+      <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  );
+}
+
+/* ─── Reusable sub-components ────────────────────────────────── */
 function PasswordField({ label, name, placeholder, value, onChange, show, onToggle, required = true }) {
   return (
     <div className="auth-field-group">
@@ -130,6 +213,7 @@ function PasswordField({ label, name, placeholder, value, onChange, show, onTogg
   );
 }
 
+/* ─── Main component ─────────────────────────────────────────── */
 export default function AuthScreen({
   mode = "login",
   setMode,
@@ -188,7 +272,7 @@ export default function AuthScreen({
 
   useEffect(() => {
     if (step === "otp" || step === "reset_otp") {
-      setTimer(300); // 5 minutes
+      setTimer(300);
       setOtpDigits(["", "", "", "", "", ""]);
       setTimeout(() => otpRefs.current[0]?.focus(), 0);
     }
@@ -213,7 +297,6 @@ export default function AuthScreen({
   const confirmOk = newPassword && newPassword === confirmPassword;
 
   const handleOtpChange = (index, value) => {
-    // Handle pasting
     if (value.length > 1) {
       const pasted = value.slice(0, 6).split("");
       const next = [...otpDigits];
@@ -274,12 +357,14 @@ export default function AuthScreen({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") || "");
-    const ok = await onResetStart(email);
+    const ok = await onResetPasswordStart(email);
     if (ok) {
       setResetEmail(email);
       setStep("reset_otp");
     }
   };
+
+  const appBrand = t("app.brand", null, "Finanzy");
 
   const heroTitle =
     mode === "login" ? (
@@ -287,13 +372,13 @@ export default function AuthScreen({
         {t("auth.hero_welcome", null, "Chào mừng bạn")}
         <br />
         {t("auth.hero_back", null, "trở lại")}{" "}
-        <span className="auth-brand">{t("app.brand", null, "Finanzy")}</span>
+        <span className="auth-brand">{appBrand}</span>
       </>
     ) : (
       <>
         {t("auth.hero_start", null, "Bắt đầu cùng")}
         <br />
-        <span className="auth-brand">{t("app.brand", null, "Finanzy")}</span>
+        <span className="auth-brand">{appBrand}</span>
       </>
     );
 
@@ -313,33 +398,65 @@ export default function AuthScreen({
   return (
     <main className="auth-shell">
       <div className="auth-layout">
-        {/* Hero Section - Visible only on Web */}
+        {/* ── Hero Section (Left panel) ── */}
         <section className="auth-hero">
           <header className="auth-hero-header">
             <div className="auth-logo">
-              <Logo size={38} />
-              <span className="logo-text">{t("app.brand", null, "Finanzy")}</span>
+              <FinovaLogo size={38} />
+              <div className="auth-logo-text-group">
+                <span className="logo-text">{appBrand}</span>
+                <span className="logo-tagline">Smart Finance</span>
+              </div>
             </div>
           </header>
+
           <div className="auth-hero-inner">
             <h1 className="auth-hero-title">{heroTitle}</h1>
             <p className="auth-hero-desc">{heroDesc}</p>
+            <HeroIllustration />
+          </div>
+
+          <div className="auth-hero-features">
+            <div className="auth-feature-item">
+              <span className="auth-feature-icon"><ChartIcon /></span>
+              <div>
+                <p className="auth-feature-title">{t("auth.feature_track", null, "Theo dõi chi tiêu")}</p>
+                <p className="auth-feature-desc">{t("auth.feature_track_desc", null, "Mọi lúc, mọi nơi")}</p>
+              </div>
+            </div>
+            <div className="auth-feature-item">
+              <span className="auth-feature-icon"><PlanIcon /></span>
+              <div>
+                <p className="auth-feature-title">{t("auth.feature_plan", null, "Lập kế hoạch")}</p>
+                <p className="auth-feature-desc">{t("auth.feature_plan_desc", null, "Mục tiêu rõ ràng")}</p>
+              </div>
+            </div>
+            <div className="auth-feature-item">
+              <span className="auth-feature-icon"><ShieldIcon /></span>
+              <div>
+                <p className="auth-feature-title">{t("auth.feature_secure", null, "Bảo mật tuyệt đối")}</p>
+                <p className="auth-feature-desc">{t("auth.feature_secure_desc", null, "An toàn thông tin")}</p>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* Form Panel Section */}
+        {/* ── Form Panel (Right) ── */}
         <section className="auth-panel">
-          {/* Logo Mark for Mobile Header */}
+          {/* Mobile-only header */}
           <div className="auth-mobile-header">
             <div className="auth-logo">
-              <Logo size={42} />
-              <span className="logo-text">{t("app.brand", null, "Finanzy")}</span>
+              <FinovaLogo size={42} />
+              <div className="auth-logo-text-group">
+                <span className="logo-text">{appBrand}</span>
+                <span className="logo-tagline">Smart Finance</span>
+              </div>
             </div>
           </div>
 
           <div className="auth-card">
             <div className="auth-card-badge">
-              <Logo size={36} />
+              <FinovaLogo size={34} />
             </div>
 
             <h2 className="auth-card-title">
@@ -351,7 +468,7 @@ export default function AuthScreen({
               {step === "reset_otp" && t("auth.verify_otp", null, "Xác thực OTP")}
               {step === "reset_set_password" && t("auth.reset_password", null, "Đặt lại mật khẩu")}
             </h2>
-            
+
             <p className="auth-card-subtitle">
               {step === "login" && t("auth.login_subtitle", null, "Quản lý tài chính cá nhân thông minh")}
               {step === "register" && t("auth.register_subtitle", null, "Bắt đầu hành trình quản lý tài chính thông minh")}
@@ -361,6 +478,7 @@ export default function AuthScreen({
             </p>
 
             <div className="auth-content">
+              {/* ── Register form ── */}
               {step === "register" && (
                 <form className="auth-form" onSubmit={handleRegisterSubmit}>
                   <div className="auth-field-group">
@@ -370,7 +488,7 @@ export default function AuthScreen({
                       <input name="full_name" type="text" placeholder={t("auth.full_name_placeholder", null, "Nhập họ và tên của bạn")} maxLength={100} required />
                     </div>
                   </div>
-                  
+
                   <div className="auth-field-group">
                     <label>{t("auth.username", null, "Username")}</label>
                     <div className="auth-input-wrapper with-icon">
@@ -421,18 +539,24 @@ export default function AuthScreen({
                       {t("auth.login", null, "Đăng nhập")}
                     </button>
                   </div>
-                  
+
                   {error && <p className="auth-form-error">{error}</p>}
                 </form>
               )}
 
+              {/* ── Login form ── */}
               {step === "login" && (
                 <form className="auth-form" onSubmit={handleLoginSubmit}>
                   <div className="auth-field-group">
                     <label>{t("auth.identifier", null, "Email hoặc Username")}</label>
                     <div className="auth-input-wrapper with-icon">
                       <span className="auth-input-icon left"><UserIcon /></span>
-                      <input name="identifier" type="text" placeholder={t("auth.identifier_placeholder", null, "Nhập email hoặc username")} required />
+                      <input
+                        name="identifier"
+                        type="text"
+                        placeholder={t("auth.identifier_placeholder", null, "Nhập email hoặc username")}
+                        required
+                      />
                     </div>
                   </div>
 
@@ -465,11 +589,23 @@ export default function AuthScreen({
                     <ArrowRightIcon />
                   </button>
 
-                  <div className="auth-divider">
-                    <span className="auth-security-info">
-                      <SecurityIcon />
-                      {t("auth.security_label", null, "Bảo mật SSL 256-bit • An toàn tuyệt đối")}
-                    </span>
+                  {/* Divider "hoặc" */}
+                  <div className="auth-or-divider">
+                    <span className="auth-or-line" />
+                    <span className="auth-or-text">hoặc</span>
+                    <span className="auth-or-line" />
+                  </div>
+
+                  {/* Google button */}
+                  <button className="auth-btn-google" type="button">
+                    <GoogleIcon />
+                    <span>Tiếp tục với Google</span>
+                  </button>
+
+                  {/* Security notice */}
+                  <div className="auth-security-row">
+                    <SecurityIcon />
+                    <span>{t("auth.security_label", null, "Bảo mật SSL 256-bit • An toàn tuyệt đối")}</span>
                   </div>
 
                   <div className="auth-card-footer">
@@ -484,7 +620,7 @@ export default function AuthScreen({
                 </form>
               )}
 
-              {/* OTP Step */}
+              {/* ── OTP Step ── */}
               {(step === "otp" || step === "reset_otp") && (
                 <div className="auth-form">
                   <p className="auth-otp-hint">
@@ -526,17 +662,17 @@ export default function AuthScreen({
                     <span>{t("auth.verify_otp", null, "Xác thực mã OTP")}</span>
                     <ArrowRightIcon />
                   </button>
-                  
+
                   <div className="auth-otp-footer">
                     {timer > 0 ? (
                       <p className="auth-timer-text">
                         {t("auth.resend_in", null, "Gửi lại mã sau")} <strong>{formatTime(timer)}</strong>
                       </p>
                     ) : (
-                      <button 
-                        className="auth-resend-btn" 
-                        type="button" 
-                        disabled={loading} 
+                      <button
+                        className="auth-resend-btn"
+                        type="button"
+                        disabled={loading}
                         onClick={() => {
                           if (step === "otp") onResendOtp(pendingEmail);
                           else onResetPasswordStart(resetEmail);
@@ -554,7 +690,7 @@ export default function AuthScreen({
                 </div>
               )}
 
-              {/* Set Password Step */}
+              {/* ── Set Password Step ── */}
               {(step === "set_password" || step === "reset_set_password") && (
                 <div className="auth-form">
                   <PasswordField
@@ -566,7 +702,7 @@ export default function AuthScreen({
                     show={showNewPassword}
                     onToggle={() => setShowNewPassword((prev) => !prev)}
                   />
-                  
+
                   <div className="auth-password-strength">
                     <div className="strength-meter">
                       <div className="strength-fill" style={{ width: `${(passwordScore / 3) * 100}%`, backgroundColor: passwordScore >= 3 ? "#10b981" : passwordScore >= 2 ? "#f59e0b" : "#ef4444" }} />
@@ -617,7 +753,7 @@ export default function AuthScreen({
                 </div>
               )}
 
-              {/* Reset Request Step */}
+              {/* ── Reset Request Step ── */}
               {step === "reset_request" && (
                 <form className="auth-form" onSubmit={handleResetRequest}>
                   <div className="auth-field-group">
@@ -627,7 +763,7 @@ export default function AuthScreen({
                       <input name="email" type="email" placeholder={t("auth.reset_email_placeholder", null, "Nhập email của bạn")} required />
                     </div>
                   </div>
-                  
+
                   <button className="auth-btn-primary" type="submit" disabled={loading}>
                     <span>{t("auth.reset_send", null, "Gửi mã xác thực")}</span>
                     <ArrowRightIcon />
