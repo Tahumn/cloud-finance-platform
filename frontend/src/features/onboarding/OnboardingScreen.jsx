@@ -82,15 +82,33 @@ export default function OnboardingScreen({ userEmail, currentUiPrefs, onComplete
   const handleNext = () => {
     setError("");
     if (step === 1) {
-      if (!accName.trim()) {
-        setError("Vui lòng nhập tên tài khoản hoặc thẻ.");
-        return;
-      }
-      if (!accBalance) {
-        setError("Vui lòng nhập số dư ban đầu.");
-        return;
-      }
-    }
+
+  if (!accName.trim()) {
+    setError("Vui lòng nhập tên tài khoản hoặc thẻ.");
+    return;
+  }
+
+  if (!accProvider) {
+    setError("Vui lòng chọn nhà cung cấp.");
+    return;
+  }
+
+  if (!accLast4.trim()) {
+    setError("Vui lòng nhập 4 số cuối.");
+    return;
+  }
+
+  if (!/^\d{4}$/.test(accLast4.trim())) {
+    setError("4 số cuối phải gồm đúng 4 chữ số.");
+    return;
+  }
+
+  if (!accBalance) {
+    setError("Vui lòng nhập số dư ban đầu.");
+    return;
+  }
+
+}
     if (step === 2) {
       if (categories.filter(c => c.enabled).length === 0) {
         setError("Vui lòng chọn ít nhất một danh mục để tiếp tục.");
@@ -111,7 +129,29 @@ export default function OnboardingScreen({ userEmail, currentUiPrefs, onComplete
     try {
       // 1. Create categories
       const enabledCats = categories.filter(c => c.enabled);
-      await Promise.all(enabledCats.map(c => createCategory(c.name).catch(() => null)));
+      console.log("Enabled Categories:", enabledCats);
+
+for (const category of enabledCats) {
+    try {
+        console.log("Creating category:", category.name);
+        await createCategory(category.name);
+        console.log("Created:", category.name);
+    } catch (err) {
+
+        if (
+            err?.message?.includes("already exists") ||
+            err?.detail === "Category already exists"
+        ) {
+            continue;
+        }
+
+        console.error("Create Category Error:", err);
+
+        throw new Error(
+            `Không thể tạo danh mục "${category.name}".`
+        );
+    }
+}
 
       const categoryPrefs = enabledCats.reduce((acc, item) => {
         acc[item.name] = { icon: item.icon, color: item.color };
@@ -504,8 +544,34 @@ export default function OnboardingScreen({ userEmail, currentUiPrefs, onComplete
 
               <div className="ob-preview-mobile">
                 <p className="preview-label">Xem trước giao diện</p>
-                <div className="mock-app">
-                  <div className="mock-sidebar">
+                <div
+  className="mock-app"
+  style={{
+    background: theme === "dark" ? "#111827" : "#ffffff",
+    color:
+      textColorMode === "gray"
+        ? "#6b7280"
+        : theme === "dark"
+        ? "#f8fafc"
+        : "#111827",
+    fontSize:
+      fontScale === "small"
+        ? "13px"
+        : fontScale === "large"
+        ? "17px"
+        : "15px",
+    transition: "all .25s ease"
+  }}
+>
+                  <div
+  className="mock-sidebar"
+  style={{
+    background:
+      theme === "dark"
+        ? "#1f2937"
+        : "#f8fafc"
+  }}
+>
                     <div className="ms-item active" style={{ backgroundColor: primaryColor }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
                     </div>
@@ -517,8 +583,24 @@ export default function OnboardingScreen({ userEmail, currentUiPrefs, onComplete
                     </div>
                     <div className="ms-item">•••</div>
                   </div>
-                  <div className="mock-main">
-                    <div className="mock-header">
+                  <div
+  className="mock-main"
+  style={{
+    background:
+      theme === "dark"
+        ? "#111827"
+        : "#ffffff"
+  }}
+>
+                    <div
+  className="mock-header"
+  style={{
+    borderBottom:
+      theme === "dark"
+        ? "1px solid #374151"
+        : "1px solid #e5e7eb"
+  }}
+>
                       <div>
                         <strong>Tổng quan</strong>
                         <p>Tài chính cá nhân</p>
@@ -526,7 +608,21 @@ export default function OnboardingScreen({ userEmail, currentUiPrefs, onComplete
                       <div className="mock-user"></div>
                     </div>
                     <div className="mock-grid">
-                      <div className="mock-card">
+                      <div
+  className="mock-card"
+  style={{
+    background:
+      theme === "dark"
+        ? "#1f2937"
+        : "#f8fafc",
+    color:
+      textColorMode === "gray"
+        ? "#6b7280"
+        : theme === "dark"
+        ? "#ffffff"
+        : "#111827"
+  }}
+>
                         <small>Mục tiêu</small>
                         <div className="mock-goal-item">
                           <div className="mg-bar"><div className="mg-fill" style={{ width: '60%', backgroundColor: primaryColor }}></div></div>
