@@ -224,6 +224,7 @@ export default function AuthScreen({
   onResetPasswordStart,
   onResetPasswordVerify,
   onResetPasswordConfirm,
+  onGoogleSubmit,
   onGoOnboarding,
   loading,
   error,
@@ -242,6 +243,8 @@ export default function AuthScreen({
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleSupportError, setGoogleSupportError] = useState("");
   const [timer, setTimer] = useState(0);
   const otpRefs = useRef([]);
 
@@ -277,6 +280,68 @@ export default function AuthScreen({
       setTimeout(() => otpRefs.current[0]?.focus(), 0);
     }
   }, [step]);
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+    if (!clientId) {
+      setGoogleReady(false);
+      setGoogleSupportError("Đặt VITE_GOOGLE_CLIENT_ID để bật Google Sign-In.");
+      return;
+    }
+
+    const initialize = () => {
+      if (!window.google?.accounts?.id) {
+        setGoogleReady(false);
+        setGoogleSupportError("Không thể khởi tạo Google SDK.");
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (response) => {
+          try {
+            if (!response?.credential) {
+              throw new Error("Google chưa trả về thông tin đăng nhập.");
+            }
+            await onGoogleSubmit?.(response.credential, remember);
+          } catch (err) {
+            setGoogleSupportError(err.message || "Không thể đăng nhập bằng Google.");
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: false,
+      });
+      setGoogleReady(true);
+      setGoogleSupportError("");
+    };
+
+    if (window.google?.accounts?.id) {
+      initialize();
+      return;
+    }
+
+    const existing = document.getElementById("google-identity-script");
+    if (existing) {
+      existing.addEventListener("load", initialize);
+      return () => existing.removeEventListener("load", initialize);
+    }
+
+    const script = document.createElement("script");
+    script.id = "google-identity-script";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = initialize;
+    script.onerror = () => {
+      setGoogleReady(false);
+      setGoogleSupportError("Không thể tải Google SDK.");
+    };
+    document.body.appendChild(script);
+    return () => {
+      script.onload = null;
+      script.onerror = null;
+    };
+  }, [onGoogleSubmit, remember]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -597,10 +662,22 @@ export default function AuthScreen({
                   </div>
 
                   {/* Google button */}
-                  <button className="auth-btn-google" type="button">
+                  <button
+                    className="auth-btn-google"
+                    type="button"
+                    onClick={() => {
+                      if (!window.google?.accounts?.id) {
+                        setGoogleSupportError("Google SDK chưa sẵn sàng.");
+                        return;
+                      }
+                      window.google.accounts.id.prompt();
+                    }}
+                    disabled={loading || !googleReady}
+                  >
                     <GoogleIcon />
-                    <span>Tiếp tục với Google</span>
+                    <span>{googleReady ? "Tiếp tục với Google" : "Đang chuẩn bị Google..."}</span>
                   </button>
+                  {googleSupportError && <p className="auth-form-error">{googleSupportError}</p>}
 
                   {/* Security notice */}
                   <div className="auth-security-row">

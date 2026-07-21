@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { clearToken, getToken, setToken } from "./api/client.js";
 import {
+  googleLogin,
   login,
   me,
   registerWithProfile,
@@ -393,7 +394,37 @@ export default function App() {
         return { next: "otp" };
       }
       const token = await login(identifier, password);
-      setToken(token.access_token, remember);
+      const accessToken = token?.access_token;
+      if (!accessToken) {
+        throw new Error("Không nhận được access token từ server.");
+      }
+      setToken(accessToken, remember);
+      const user = await me();
+      setAuthState({ status: "authed", user });
+      setActiveUserEmail(user?.email || "guest");
+      const hasOnboarded = isOnboardingDone(user?.email);
+      setNeedsOnboarding(!hasOnboarded);
+      setView(hasOnboarded ? "dashboard" : "onboarding");
+      return { next: "authed" };
+    } catch (err) {
+      setError(err.message || t("auth.error.generic"));
+      return { next: "error" };
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleSubmit = async (credential, remember = true) => {
+    setAuthLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const token = await googleLogin(credential);
+      const accessToken = token?.access_token;
+      if (!accessToken) {
+        throw new Error("Không nhận được access token từ server.");
+      }
+      setToken(accessToken, remember);
       const user = await me();
       setAuthState({ status: "authed", user });
       setActiveUserEmail(user?.email || "guest");
@@ -643,9 +674,12 @@ export default function App() {
   }, [loadFinanceData]);
 
   useEffect(() => {
+    if (authState.status !== "authed" || needsOnboarding) return undefined;
+
     const socket = io(getSocketBase(), {
       path: "/ws/socket.io/",
-      transports: ["websocket", "polling"]
+      transports: ["websocket", "polling"],
+      reconnection: false
     });
     socket.on("finance:update", (payload) => {
       const currentUserId = authUserIdRef.current;
@@ -655,7 +689,7 @@ export default function App() {
     return () => {
       socket.disconnect();
     };
-  }, [scheduleRefresh]);
+  }, [authState.status, needsOnboarding, scheduleRefresh]);
 
   useEffect(() => {
     const handleFocus = () => scheduleRefresh(0);
@@ -1026,6 +1060,7 @@ export default function App() {
           mode={authMode}
           setMode={setAuthMode}
           onSubmit={handleAuthSubmit}
+          onGoogleSubmit={handleGoogleSubmit}
           onVerifyOtp={handleVerifyOtp}
           onResendOtp={handleResendOtp}
           onSetPassword={handleSetPassword}

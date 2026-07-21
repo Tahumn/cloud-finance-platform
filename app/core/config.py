@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="change-this-to-a-long-random-string")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    google_client_id: str | None = None
 
     # Queue
     redis_url: str = "redis://redis:6379/0"

@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
+import re
 import secrets
 
+import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -35,6 +37,47 @@ def _normalize_phone(phone: str | None) -> str | None:
     if phone.startswith("+"):
         phone = phone[1:]
     return phone or None
+
+
+def _build_unique_username(db: Session, email: str, first_name: str | None, last_name: str | None) -> str:
+    base = (email.split("@", 1)[0] or "user").replace(".", "_").replace("-", "_")
+    base = re.sub(r"[^a-zA-Z0-9_]", "", base) or "user"
+    if first_name and last_name:
+        base = f"{first_name[:12]}_{last_name[:12]}".lower().replace(" ", "_")
+    candidate = base.lower()
+    suffix = 1
+    while db.query(User).filter(User.username == candidate).first():
+        candidate = f"{base.lower()}_{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _verify_google_id_token(credential: str) -> dict:
+    try:
+        response = httpx.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": credential},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to verify Google sign-in token",
+        ) from exc
+
+    payload = response.json()
+    if payload.get("error"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google sign-in token")
+    if not payload.get("email_verified"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google email is not verified")
+
+    expected_aud = (settings.google_client_id or "").strip()
+    aud = payload.get("aud")
+    if expected_aud and aud and aud != expected_aud:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google client mismatch")
+    return payload
+
 
 def _validate_password_strength(password: str) -> None:
     if len(password) < 8:
@@ -145,6 +188,56 @@ def authenticate_user(db: Session, user: schemas.UserLogin) -> schemas.Token:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email is not verified",
         )
+
+    token = create_access_token(
+        subject=str(db_user.id),
+        email=db_user.email,
+        is_active=bool(db_user.is_active),
+    )
+    return schemas.Token(access_token=token)
+
+
+def authenticate_google_user(db: Session, user: schemas.GoogleAuthRequest) -> schemas.Token:
+    profile = _verify_google_id_token(user.credential)
+    email = (profile.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account email is required")
+
+    db_user = db.query(User).filter(User.email == email).first()
+    if db_user is None:
+        username = _build_unique_username(
+            db,
+            email,
+            profile.get("given_name"),
+            profile.get("family_name"),
+        )
+        db_user = User(
+            email=email,
+            username=username,
+            first_name=profile.get("given_name"),
+            last_name=profile.get("family_name"),
+            hashed_password=hash_password(secrets.token_urlsafe(24)),
+            email_verified=True,
+            is_active=True,
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    else:
+        db_user.first_name = db_user.first_name or profile.get("given_name")
+        db_user.last_name = db_user.last_name or profile.get("family_name")
+        db_user.email_verified = True
+        db_user.is_active = True
+        if not db_user.username:
+            db_user.username = _build_unique_username(
+                db,
+                email,
+                db_user.first_name,
+                db_user.last_name,
+            )
+        if not db_user.hashed_password:
+            db_user.hashed_password = hash_password(secrets.token_urlsafe(24))
+        db.commit()
 
     token = create_access_token(
         subject=str(db_user.id),

@@ -13,18 +13,27 @@ export const getBaseUrl = () => API_BASE.replace(/\/api\/v1$/, "");
 
 const TOKEN_KEY = "finance_token";
 
+const normalizeToken = (value) => {
+  if (!value || value === "undefined" || value === "null") return null;
+  return String(value).trim();
+};
+
 export const getToken = () => {
-  const token = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
-  if (!token || token === "undefined" || token === "null") return null;
+  const token = normalizeToken(sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY));
   return token;
 };
 
 export const setToken = (token, remember = true) => {
-  clearToken();
+  const normalized = normalizeToken(token);
+  if (!normalized) {
+    clearToken();
+    return;
+  }
+  sessionStorage.setItem(TOKEN_KEY, normalized);
   if (remember) {
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, normalized);
   } else {
-    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(TOKEN_KEY);
   }
 };
 

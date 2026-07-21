@@ -12,5 +12,8 @@
     "seed": "python -m app.scripts.seed_recent_transactions --months 6"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@react-oauth/google": "^0.13.5"
+  }
 }

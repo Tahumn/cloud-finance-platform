@@ -6,6 +6,12 @@ export const login = (identifier, password) =>
     body: { identifier, password }
   });
 
+export const googleLogin = (credential) =>
+  request("/auth/google", {
+    method: "POST",
+    body: { credential }
+  });
+
 export const me = () => request("/auth/me");
 
 export const registerWithProfile = (payload) =>

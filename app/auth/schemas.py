@@ -15,6 +15,10 @@ class UserLogin(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(..., min_length=1, max_length=8192)
+
+
 class UserRead(BaseModel):
     id: int
     email: EmailStr
