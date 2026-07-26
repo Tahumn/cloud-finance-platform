@@ -7,7 +7,7 @@ services:
     env_file:
     - .env
     environment:
-      DB_URL: postgresql://finance_user:finance_pass@finance-postgres:5432/finance_db
+      DB_URL: ${FINANCE_DB_URL}
       SECRET_KEY: ${SECRET_KEY:-change-this-to-a-long-random-string}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
@@ -36,7 +36,7 @@ services:
     env_file:
     - .env
     environment:
-      DB_URL: postgresql://finance_user:finance_pass@finance-postgres:5432/finance_db
+      DB_URL: ${FINANCE_DB_URL}
       SEED_MONTHS: ${SEED_MONTHS:-6}
       SEED_FORCE: ${SEED_FORCE:-true}
       SEED_CREATE_DEMO_USER: ${SEED_CREATE_DEMO_USER:-true}
@@ -204,8 +204,8 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${AUTH_DB_URL:-postgresql://finance_user:finance_pass@auth-postgres:5432/auth_db}
-    - DB_SCHEMA=${AUTH_DB_SCHEMA:-auth_service}
+    - DB_URL=${AUTH_DB_URL}
+    - DB_SCHEMA=${AUTH_DB_SCHEMA}
     command:
     - uvicorn
     - app.services.auth_main:app
@@ -228,8 +228,8 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${FINANCE_DB_URL:-postgresql://finance_user:finance_pass@finance-postgres:5432/finance_db}
-    - DB_SCHEMA=${FINANCE_DB_SCHEMA:-finance_service}
+    - DB_URL=${FINANCE_DB_URL}
+    - DB_SCHEMA=${FINANCE_DB_SCHEMA}
     command:
     - uvicorn
     - app.services.finance_main:app
@@ -252,8 +252,8 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${PLANNING_DB_URL:-postgresql://finance_user:finance_pass@planning-postgres:5432/planning_db}
-    - DB_SCHEMA=${PLANNING_DB_SCHEMA:-planning_service}
+    - DB_URL=${PLANNING_DB_URL}
+    - DB_SCHEMA=${PLANNING_DB_SCHEMA}
     command:
     - uvicorn
     - app.services.planning_main:app
@@ -276,8 +276,8 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${RECURRING_DB_URL:-postgresql://finance_user:finance_pass@recurring-postgres:5432/recurring_db}
-    - DB_SCHEMA=${RECURRING_DB_SCHEMA:-recurring_service}
+    - DB_URL=${RECURRING_DB_URL}
+    - DB_SCHEMA=${RECURRING_DB_SCHEMA}
     command:
     - uvicorn
     - app.services.recurring_main:app
@@ -300,9 +300,9 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${NOTIFICATIONS_DB_URL:-postgresql://finance_user:finance_pass@notifications-postgres:5432/notifications_db}
-    - DB_SCHEMA=${NOTIFICATIONS_DB_SCHEMA:-notifications_service}
-    - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    - DB_URL=${NOTIFICATIONS_DB_URL}
+    - DB_SCHEMA=${NOTIFICATIONS_DB_SCHEMA}
+    - REDIS_URL=${REDIS_URL}
     command:
     - uvicorn
     - app.services.notifications_main:app
@@ -327,9 +327,9 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${NOTIFICATIONS_DB_URL:-postgresql://finance_user:finance_pass@notifications-postgres:5432/notifications_db}
-    - DB_SCHEMA=${NOTIFICATIONS_DB_SCHEMA:-notifications_service}
-    - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    - DB_URL=${NOTIFICATIONS_DB_URL}
+    - DB_SCHEMA=${NOTIFICATIONS_DB_SCHEMA}
+    - REDIS_URL=${REDIS_URL}
     command:
     - python
     - -m
@@ -349,8 +349,8 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${AI_DB_URL:-postgresql://finance_user:finance_pass@ai-postgres:5432/ai_db}
-    - DB_SCHEMA=${AI_DB_SCHEMA:-ai_service}
+    - DB_URL=${AI_DB_URL}
+    - DB_SCHEMA=${AI_DB_SCHEMA}
     command:
     - uvicorn
     - app.services.ai_main:app
@@ -548,8 +548,8 @@ services:
     env_file:
     - .env
     environment:
-    - DB_URL=${FINANCE_DB_URL:-postgresql://finance_user:finance_pass@finance-postgres:5432/finance_db}
-    - DB_SCHEMA=finance_service
+    - DB_URL=${FINANCE_DB_URL}
+    - DB_SCHEMA=${FINANCE_DB_SCHEMA}
     command:
     - uvicorn
     - app.services.ocr_main:app
