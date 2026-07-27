@@ -8,11 +8,25 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    username = Column(String, unique=True, index=True, nullable=True)
+    username = Column(String, index=True, nullable=True)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
+    phone = Column(
+    String,
+    unique=True,
+    index=True,
+    nullable=True
+)
     hashed_password = Column(String, nullable=False)
+
+    google_id = Column(
+    String,
+    unique=True,
+    index=True,
+    nullable=True
+)
+    auth_provider = Column(String, default="local")
+
     email_verified = Column(Boolean, nullable=False, server_default="false")
     is_active = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

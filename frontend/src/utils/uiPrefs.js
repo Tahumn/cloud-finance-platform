@@ -1,9 +1,9 @@
 const DEFAULT_UI_PREFS = {
-  theme: "light",
+  theme: null,
   compactMode: false,
   reportLayout: "cards",
   templateId: "classic",
-  brandColor: "#2e6bd1"
+  brandColor: null,
 };
 
 const UI_LAYOUTS = [
@@ -20,8 +20,8 @@ const UI_LAYOUTS = [
       cardRadius: "18px",
       panelPadding: "18px",
       gridGap: "18px",
-      panelShadow: "0 14px 30px rgba(16, 24, 40, 0.08)"
-    }
+      panelShadow: "0 14px 30px rgba(16, 24, 40, 0.08)",
+    },
   },
   {
     id: "airy",
@@ -36,8 +36,8 @@ const UI_LAYOUTS = [
       cardRadius: "20px",
       panelPadding: "22px",
       gridGap: "22px",
-      panelShadow: "0 18px 36px rgba(16, 24, 40, 0.12)"
-    }
+      panelShadow: "0 18px 36px rgba(16, 24, 40, 0.12)",
+    },
   },
   {
     id: "compact",
@@ -52,8 +52,8 @@ const UI_LAYOUTS = [
       cardRadius: "14px",
       panelPadding: "14px",
       gridGap: "12px",
-      panelShadow: "0 10px 22px rgba(16, 24, 40, 0.08)"
-    }
+      panelShadow: "0 10px 22px rgba(16, 24, 40, 0.08)",
+    },
   },
   {
     id: "editorial",
@@ -68,17 +68,42 @@ const UI_LAYOUTS = [
       cardRadius: "16px",
       panelPadding: "20px",
       gridGap: "16px",
-      panelShadow: "0 16px 32px rgba(16, 24, 40, 0.1)"
-    }
-  }
+      panelShadow: "0 16px 32px rgba(16, 24, 40, 0.1)",
+    },
+  },
 ];
 
 const UI_COLORS = [
-  { id: "blue", labelKey: "settings.color.blue", label: "Ocean Blue", value: "#2e6bd1" },
-  { id: "teal", labelKey: "settings.color.teal", label: "Teal Green", value: "#2d7a5f" },
-  { id: "amber", labelKey: "settings.color.amber", label: "Warm Amber", value: "#d86a4b" },
-  { id: "violet", labelKey: "settings.color.violet", label: "Violet", value: "#6d5bd0" },
-  { id: "rose", labelKey: "settings.color.rose", label: "Rose", value: "#d34f6a" }
+  {
+    id: "blue",
+    labelKey: "settings.color.blue",
+    label: "Ocean Blue",
+    value: "#2e6bd1",
+  },
+  {
+    id: "teal",
+    labelKey: "settings.color.teal",
+    label: "Teal Green",
+    value: "#2d7a5f",
+  },
+  {
+    id: "amber",
+    labelKey: "settings.color.amber",
+    label: "Warm Amber",
+    value: "#d86a4b",
+  },
+  {
+    id: "violet",
+    labelKey: "settings.color.violet",
+    label: "Violet",
+    value: "#6d5bd0",
+  },
+  {
+    id: "rose",
+    labelKey: "settings.color.rose",
+    label: "Rose",
+    value: "#d34f6a",
+  },
 ];
 
 const LEGACY_TEMPLATE_COLORS = {
@@ -86,7 +111,7 @@ const LEGACY_TEMPLATE_COLORS = {
   mint: "#2d7a5f",
   peach: "#d86a4b",
   sky: "#2e6bd1",
-  midnight: "#4f8cff"
+  midnight: "#4f8cff",
 };
 
 const layoutMap = UI_LAYOUTS.reduce((acc, layout) => {
@@ -116,24 +141,28 @@ const normalizeColor = (value) => {
 const normalizePrefs = (prefs = {}) => {
   const merged = { ...DEFAULT_UI_PREFS, ...prefs };
   const legacyColor = LEGACY_TEMPLATE_COLORS[merged.templateId];
-  const templateId = layoutMap[merged.templateId] ? merged.templateId : DEFAULT_UI_PREFS.templateId;
+  const templateId = layoutMap[merged.templateId]
+    ? merged.templateId
+    : DEFAULT_UI_PREFS.templateId;
   const brandColor =
     normalizeColor(merged.brandColor) ||
     normalizeColor(legacyColor) ||
     DEFAULT_UI_PREFS.brandColor;
   return {
-    theme: normalizeTheme(merged.theme),
+    theme: merged.theme ? normalizeTheme(merged.theme) : null,
     compactMode: Boolean(merged.compactMode),
     reportLayout: normalizeLayout(merged.reportLayout),
     templateId,
-    brandColor
+    brandColor,
   };
 };
 
 const resolveTheme = (theme) => {
   if (theme === "system") {
     if (typeof window !== "undefined" && window.matchMedia) {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
     }
     return "light";
   }
@@ -151,7 +180,7 @@ const hexToRgb = (hex) => {
   return {
     r: (value >> 16) & 255,
     g: (value >> 8) & 255,
-    b: value & 255
+    b: value & 255,
   };
 };
 
@@ -165,14 +194,16 @@ const adjustColor = (hex, amount) => {
   return rgbToHex({
     r: clamp(Math.round(rgb.r + amount), 0, 255),
     g: clamp(Math.round(rgb.g + amount), 0, 255),
-    b: clamp(Math.round(rgb.b + amount), 0, 255)
+    b: clamp(Math.round(rgb.b + amount), 0, 255),
   });
 };
 
 const luminance = ({ r, g, b }) => {
   const convert = (value) => {
     const channel = value / 255;
-    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    return channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4;
   };
   return 0.2126 * convert(r) + 0.7152 * convert(g) + 0.0722 * convert(b);
 };
@@ -197,7 +228,10 @@ const getUiPrefs = (email) => {
 const saveUiPrefs = (email, prefs) => {
   if (typeof localStorage !== "undefined") {
     try {
-      localStorage.setItem(prefsKey(email), JSON.stringify(normalizePrefs(prefs)));
+      localStorage.setItem(
+        prefsKey(email),
+        JSON.stringify(normalizePrefs(prefs)),
+      );
     } catch {
       // ignore
     }
@@ -205,8 +239,8 @@ const saveUiPrefs = (email, prefs) => {
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent("finance:ui-prefs", {
-        detail: { email: email || "guest", prefs: normalizePrefs(prefs) }
-      })
+        detail: { email: email || "guest", prefs: normalizePrefs(prefs) },
+      }),
     );
   }
 };
@@ -218,20 +252,33 @@ const applyUiPrefs = (prefs) => {
   const resolvedTheme = resolveTheme(normalized.theme);
   const root = document.documentElement;
   const body = document.body;
-  root.dataset.theme = resolvedTheme;
+  if (normalized.theme) {
+    root.dataset.theme = resolvedTheme;
+  }
   root.dataset.layout = layout.id;
   if (body) {
     body.classList.toggle("compact-mode", normalized.compactMode);
   }
 
-  const brandBase = normalized.brandColor || DEFAULT_UI_PREFS.brandColor;
+  const brandBase = normalized.brandColor || "#1565c0";
   const primary =
-    resolvedTheme === "dark" ? adjustColor(brandBase, 30) : adjustColor(brandBase, 0);
-  const primaryDark = adjustColor(primary, resolvedTheme === "dark" ? -10 : -24);
+    resolvedTheme === "dark"
+      ? adjustColor(brandBase, 30)
+      : adjustColor(brandBase, 0);
+  const primaryDark = adjustColor(
+    primary,
+    resolvedTheme === "dark" ? -10 : -24,
+  );
   const accent = adjustColor(primary, resolvedTheme === "dark" ? 40 : 48);
   const onPrimary = readableTextColor(primary);
-  const balanceStart = adjustColor(primary, resolvedTheme === "dark" ? -50 : -30);
-  const balanceMiddle = adjustColor(primary, resolvedTheme === "dark" ? -20 : -10);
+  const balanceStart = adjustColor(
+    primary,
+    resolvedTheme === "dark" ? -50 : -30,
+  );
+  const balanceMiddle = adjustColor(
+    primary,
+    resolvedTheme === "dark" ? -20 : -10,
+  );
   const balanceEnd = adjustColor(primary, resolvedTheme === "dark" ? 30 : 50);
 
   const variables = {
@@ -248,7 +295,7 @@ const applyUiPrefs = (prefs) => {
     "--card-radius": layout.values.cardRadius,
     "--panel-padding": layout.values.panelPadding,
     "--grid-gap": layout.values.gridGap,
-    "--panel-shadow": layout.values.panelShadow
+    "--panel-shadow": layout.values.panelShadow,
   };
 
   Object.entries(variables).forEach(([key, value]) => {
@@ -257,4 +304,11 @@ const applyUiPrefs = (prefs) => {
   });
 };
 
-export { DEFAULT_UI_PREFS, UI_LAYOUTS, UI_COLORS, applyUiPrefs, getUiPrefs, saveUiPrefs };
+export {
+  DEFAULT_UI_PREFS,
+  UI_LAYOUTS,
+  UI_COLORS,
+  applyUiPrefs,
+  getUiPrefs,
+  saveUiPrefs,
+};

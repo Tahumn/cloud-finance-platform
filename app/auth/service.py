@@ -15,6 +15,9 @@ from app.database import get_db
 from app.core.config import settings
 from jose import jwt
 
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
@@ -84,18 +87,26 @@ def start_register(db: Session, user: schemas.RegisterStartRequest) -> str | Non
 
     phone = _normalize_phone(user.phone)
 
-    existing_username = (
-        db.query(User).filter(User.username == username).first()
+    existing_phone = None
+
+if phone:
+    existing_phone = (
+        db.query(User)
+        .filter(User.phone == phone)
+        .first()
     )
 
     exists = db.query(User).filter(User.email == user.email).first()
     if exists:
+        if existing_phone and existing_phone.id != exists.id:
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Phone already exists"
+    )
         # If not yet verified, allow updating profile + resend OTP.
         if exists.email_verified:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
 
-        if existing_username and existing_username.id != exists.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
         first_name, last_name = _split_full_name(full_name)
         exists.first_name = first_name
@@ -108,10 +119,15 @@ def start_register(db: Session, user: schemas.RegisterStartRequest) -> str | Non
         db.commit()
         return _create_and_send_email_otp(db, exists)
 
-    if existing_username:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
     first_name, last_name = _split_full_name(full_name)
+
+    if existing_phone:
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Phone already exists"
+    )
+
     db_user = User(
         email=user.email,
         username=username,
@@ -153,6 +169,16 @@ def authenticate_user(db: Session, user: schemas.UserLogin) -> schemas.Token:
     )
     return schemas.Token(access_token=token)
 
+def google_login(db: Session, payload: schemas.GoogleLoginRequest) -> schemas.Token:
+    idinfo = id_token.verify_oauth2_token(
+        payload.token,
+        requests.Request(),
+    )
+
+    email = idinfo["email"]
+    google_id = idinfo["sub"]
+    first_name = idinfo.get("given_name", "")
+    last_name = idinfo.get("family_name", "")
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),

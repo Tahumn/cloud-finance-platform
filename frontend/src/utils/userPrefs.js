@@ -6,17 +6,19 @@ const DEFAULT_USER_PREFS = {
   primaryColor: "#1565c0",
   fontScale: "medium",
   textColorMode: "auto",
-  textColor: ""
+  textColor: "",
 };
 
 const ACTIVE_USER_KEY = "finance_active_user";
 
 const prefsKey = (email) => `finance_user_prefs:${email || "guest"}`;
 const onboardingKey = (email) => `finance_onboarding_done:${email || "guest"}`;
-const categoryPrefsKey = (email) => `finance_category_prefs:${email || "guest"}`;
+const categoryPrefsKey = (email) =>
+  `finance_category_prefs:${email || "guest"}`;
 
 const normalizeLanguage = (value) => (value === "en" ? "en" : "vi");
-const normalizeCurrency = (value) => (typeof value === "string" && value ? value : "VND");
+const normalizeCurrency = (value) =>
+  typeof value === "string" && value ? value : "VND";
 const normalizeTimezone = (value) =>
   typeof value === "string" && value ? value : DEFAULT_USER_PREFS.timezone;
 const normalizeTheme = (value) => (value === "dark" ? "dark" : "light");
@@ -24,17 +26,21 @@ const normalizeFontScale = (value) => {
   if (value === "small" || value === "large") return value;
   return "medium";
 };
-const normalizeTextColorMode = (value) => (value === "custom" ? "custom" : "auto");
+const normalizeTextColorMode = (value) =>
+  value === "custom" ? "custom" : "auto";
 
 const normalizePrefs = (prefs = {}) => ({
   language: normalizeLanguage(prefs.language),
   currency: normalizeCurrency(prefs.currency),
   timezone: normalizeTimezone(prefs.timezone),
   theme: normalizeTheme(prefs.theme),
-  primaryColor: typeof prefs.primaryColor === "string" ? prefs.primaryColor : DEFAULT_USER_PREFS.primaryColor,
+  primaryColor:
+    typeof prefs.primaryColor === "string"
+      ? prefs.primaryColor
+      : DEFAULT_USER_PREFS.primaryColor,
   fontScale: normalizeFontScale(prefs.fontScale),
   textColorMode: normalizeTextColorMode(prefs.textColorMode),
-  textColor: typeof prefs.textColor === "string" ? prefs.textColor : ""
+  textColor: typeof prefs.textColor === "string" ? prefs.textColor : "",
 });
 
 const safeStorageGet = (key) => {
@@ -64,7 +70,8 @@ const safeStorageRemove = (key) => {
   }
 };
 
-export const getActiveUserEmail = () => safeStorageGet(ACTIVE_USER_KEY) || "guest";
+export const getActiveUserEmail = () =>
+  safeStorageGet(ACTIVE_USER_KEY) || "guest";
 
 export const setActiveUserEmail = (email) => {
   safeStorageSet(ACTIVE_USER_KEY, email || "guest");
@@ -88,13 +95,14 @@ export const saveUserPrefs = (email, prefs) => {
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent("finance:user-prefs", {
-        detail: { email: target, prefs: normalized }
-      })
+        detail: { email: target, prefs: normalized },
+      }),
     );
   }
 };
 
-export const isOnboardingDone = (email) => safeStorageGet(onboardingKey(email)) === "1";
+export const isOnboardingDone = (email) =>
+  safeStorageGet(onboardingKey(email)) === "1";
 
 export const setOnboardingDone = (email, done = true) => {
   safeStorageSet(onboardingKey(email), done ? "1" : "0");
@@ -131,7 +139,7 @@ const hexToRgb = (hex) => {
   return {
     r: (value >> 16) & 255,
     g: (value >> 8) & 255,
-    b: value & 255
+    b: value & 255,
   };
 };
 
@@ -145,20 +153,55 @@ const adjustColor = (hex, amount) => {
   return rgbToHex({
     r: clamp(Math.round(rgb.r + amount), 0, 255),
     g: clamp(Math.round(rgb.g + amount), 0, 255),
-    b: clamp(Math.round(rgb.b + amount), 0, 255)
+    b: clamp(Math.round(rgb.b + amount), 0, 255),
   });
 };
 
 export const applyUserPrefs = (prefs) => {
   if (typeof document === "undefined") return;
+
   const normalized = normalizePrefs(prefs);
   const root = document.documentElement;
+
+  // Language
   root.dataset.lang = normalized.language;
-  root.lang = normalized.language === "en" ? "en" : "vi";
-  root.style.setProperty("--font-scale", normalized.fontScale === "small" ? "0.92" : normalized.fontScale === "large" ? "1.08" : "1");
+  root.lang = normalized.language;
+
+  // Theme
+  root.dataset.theme = normalized.theme;
+
+  // Primary color
+  root.style.setProperty(
+    "--primary-color",
+    normalized.primaryColor || "#2563eb",
+  );
+
+  root.style.setProperty("--primary", normalized.primaryColor || "#2563eb");
+
+  // Font Scale
+  const fontScale =
+    normalized.fontScale === "small"
+      ? 0.9
+      : normalized.fontScale === "large"
+        ? 1.1
+        : 1;
+
+  root.style.setProperty("--font-scale", fontScale);
+
+  // Text color
+  if (normalized.textColorMode === "dark") {
+    root.style.setProperty("--text-color", "#111827");
+  } else if (normalized.textColorMode === "light") {
+    root.style.setProperty("--text-color", "#ffffff");
+  } else if (normalized.textColorMode === "custom" && normalized.textColor) {
+    root.style.setProperty("--text-color", normalized.textColor);
+  } else {
+    root.style.removeProperty("--text-color");
+  }
 };
 
-export const getLocaleForLanguage = (language) => (language === "en" ? "en-US" : "vi-VN");
+export const getLocaleForLanguage = (language) =>
+  language === "en" ? "en-US" : "vi-VN";
 
 export const getDefaultTimezone = () => {
   if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {

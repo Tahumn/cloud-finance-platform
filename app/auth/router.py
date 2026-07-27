@@ -49,7 +49,13 @@ async def login(request: Request, db: Session = Depends(get_db)):
     identifier = data.get("identifier") or data.get("email") or data.get("username")
     payload = schemas.UserLogin(identifier=identifier, password=data.get("password"))
     return service.authenticate_user(db, payload)
-
+    
+@router.post("/google", response_model=schemas.Token)
+def google_login(
+    payload: schemas.GoogleLoginRequest,
+    db: Session = Depends(get_db),
+):
+    return service.google_login(db, payload)
 
 @router.post("/verify-otp")
 def verify_otp(payload: schemas.VerifyOtpRequest, db: Session = Depends(get_db)):

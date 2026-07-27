@@ -24,3 +24,4 @@ alembic
 pytest
 pytest-mock
 ruff
+google-auth

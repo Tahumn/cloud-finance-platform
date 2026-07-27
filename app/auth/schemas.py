@@ -14,6 +14,8 @@ class UserLogin(BaseModel):
     identifier: str = Field(..., min_length=1, max_length=100)
     password: str
 
+class GoogleLoginRequest(BaseModel):
+    token: str
 
 class UserRead(BaseModel):
     id: int
