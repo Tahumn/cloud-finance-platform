@@ -1,0 +1,266 @@
+PROJECT: Cloud Finance
+REGION: ap-southeast-1
+ECR REPOSITORY:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend
+
+==================================================
+1. GATEWAY
+==================================================
+Task family: cloud-finance-gateway
+Container name: gateway
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:gateway-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: 8000
+Protocol: TCP
+
+Command:
+uvicorn
+app.gateway_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+AUTH_SERVICE_URL
+FINANCE_SERVICE_URL
+NOTIFICATIONS_SERVICE_URL
+AI_SERVICE_URL
+OCR_SERVICE_URL
+PLANNING_SERVICE_URL
+RECURRING_SERVICE_URL
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+2. AUTH
+==================================================
+Task family: cloud-finance-auth
+Container name: auth
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:auth-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: 8000
+Protocol: TCP
+
+Command:
+uvicorn
+app.services.auth_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+SECRET_KEY
+ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES
+DEV_RETURN_OTP
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASSWORD
+SMTP_FROM
+OTP_EXPIRE_MINUTES
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+3. FINANCE
+==================================================
+Task family: cloud-finance-finance
+Container name: finance
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:finance-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: 8000
+
+Command:
+uvicorn
+app.services.finance_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+4. NOTIFICATIONS
+==================================================
+Task family: cloud-finance-notifications
+Container name: notifications
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:notifications-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: 8000
+
+Command:
+uvicorn
+app.services.notifications_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+REDIS_URL
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+5. NOTIFICATIONS WORKER
+==================================================
+Task family: cloud-finance-notifications-worker
+Container name: notifications-worker
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:notifications-worker-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: NONE
+
+Command:
+python
+-m
+app.workers.notifications_worker
+
+Environment:
+DB_URL
+DB_SCHEMA
+REDIS_URL
+
+Health check:
+NONE
+
+==================================================
+6. AI
+==================================================
+Task family: cloud-finance-ai
+Container name: ai
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:ai-v1
+
+CPU: 512
+Memory: 1024 MB
+Container port: 8000
+
+Command:
+uvicorn
+app.services.ai_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+DIFY_API_BASE
+DIFY_API_KEY
+DIFY_FORCE_JSON
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+7. PLANNING
+==================================================
+Task family: cloud-finance-planning
+Container name: planning
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:planning-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: 8000
+
+Command:
+uvicorn
+app.services.planning_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+8. RECURRING
+==================================================
+Task family: cloud-finance-recurring
+Container name: recurring
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:recurring-v1
+
+CPU: 256
+Memory: 512 MB
+Container port: 8000
+
+Command:
+uvicorn
+app.services.recurring_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1
+
+==================================================
+9. OCR
+==================================================
+Task family: cloud-finance-ocr
+Container name: ocr
+Image:
+347412228908.dkr.ecr.ap-southeast-1.amazonaws.com/cloud-finance-backend:ocr-v1
+
+CPU: 512
+Memory: 1024 MB
+Container port: 8000
+
+Command:
+uvicorn
+app.services.ocr_main:app
+--host
+0.0.0.0
+--port
+8000
+
+Environment:
+DB_URL
+DB_SCHEMA
+
+Health check:
+CMD-SHELL,curl -f http://localhost:8000/health || exit 1

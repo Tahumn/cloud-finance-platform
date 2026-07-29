@@ -55,3 +55,14 @@ scratch/
 # Runtime uploads
 uploads/*
 !uploads/.gitkeep
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+frontend/.env.production
+frontend/.env.local
+frontend/.env.*.local
+
+ecs/local-env/

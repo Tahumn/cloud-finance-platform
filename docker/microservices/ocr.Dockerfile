@@ -6,7 +6,7 @@ ENV PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Cài dependency hệ thống trước để tận dụng Docker cache
+# CĂ i dependency há»‡ thá»‘ng trÆ°á»›c Ä‘á»ƒ táº­n dá»¥ng Docker cache
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         tesseract-ocr \
@@ -25,4 +25,4 @@ COPY alembic /app/alembic
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.services.ocr_main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -154,9 +154,10 @@ services:
     image: langgenius/dify-sandbox:latest
     container_name: dify-sandbox
   gateway:
+    image: cloud-finance-platform/gateway:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/gateway.Dockerfile
     container_name: finance-gateway
     env_file:
     - .env
@@ -197,9 +198,10 @@ services:
     volumes:
     - ./uploads:/app/uploads
   auth:
+    image: cloud-finance-platform/auth:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/auth.Dockerfile
     container_name: finance-auth
     env_file:
     - .env
@@ -221,9 +223,10 @@ services:
     profiles:
     - micro
   finance:
+    image: cloud-finance-platform/finance:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/finance.Dockerfile
     container_name: finance-finance
     env_file:
     - .env
@@ -245,9 +248,10 @@ services:
     profiles:
     - micro
   planning:
+    image: cloud-finance-platform/planning:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/planning.Dockerfile
     container_name: finance-planning
     env_file:
     - .env
@@ -269,9 +273,10 @@ services:
     profiles:
     - micro
   recurring:
+    image: cloud-finance-platform/recurring:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/recurring.Dockerfile
     container_name: finance-recurring
     env_file:
     - .env
@@ -293,9 +298,10 @@ services:
     profiles:
     - micro
   notifications:
+    image: cloud-finance-platform/notifications:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/notifications.Dockerfile
     container_name: finance-notifications
     env_file:
     - .env
@@ -320,9 +326,10 @@ services:
     profiles:
     - micro
   notifications-worker:
+    image: cloud-finance-platform/notifications-worker:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/notifications-worker.Dockerfile
     container_name: finance-notifications-worker
     env_file:
     - .env
@@ -342,9 +349,10 @@ services:
     profiles:
     - micro
   ai:
+    image: cloud-finance-platform/ai:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/ai.Dockerfile
     container_name: finance-ai
     env_file:
     - .env
@@ -541,9 +549,10 @@ services:
       timeout: 5s
       retries: 20
   ocr:
+    image: cloud-finance-platform/ocr:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/microservices/ocr.Dockerfile
     container_name: finance-ocr
     env_file:
     - .env
