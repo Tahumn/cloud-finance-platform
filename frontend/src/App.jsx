@@ -214,9 +214,28 @@ export default function App() {
   const bootstrapTriedRef = useRef(false);
 
   useEffect(() => {
-    const email = authState.user?.email || "guest";
-    applyUserPrefs(getUserPrefs(email));
-  }, [authState.user?.email, authState.status]);
+  const email = authState.user?.email || "guest";
+
+  const nextUiPrefs = getUiPrefs(email);
+  const nextUserPrefs = getUserPrefs(email);
+
+  // Kết hợp hai nơi lưu cài đặt.
+  // userPrefs của onboarding được ưu tiên cho theme và màu chủ đạo.
+  const mergedUiPrefs = {
+    ...nextUiPrefs,
+    theme: nextUserPrefs.theme || nextUiPrefs.theme,
+    brandColor:
+      nextUserPrefs.primaryColor || nextUiPrefs.brandColor,
+  };
+
+  setUiPrefs(mergedUiPrefs);
+
+  // Phải áp dụng uiPrefs trước.
+  applyUiPrefs(mergedUiPrefs);
+
+  // Sau đó mới áp dụng cài đặt user để không bị ghi đè.
+  applyUserPrefs(nextUserPrefs);
+}, [authState.user?.email, authState.status]);
 
   useEffect(() => {
     const handlePrefs = (event) => {
@@ -226,13 +245,20 @@ export default function App() {
 
       if ((event.detail.email || "guest") !== currentEmail) return;
 
-      const nextUiPrefs = getUiPrefs(currentEmail);
+      const nextUserPrefs = getUserPrefs(currentEmail);
+const nextUiPrefs = getUiPrefs(currentEmail);
 
-      setUiPrefs(nextUiPrefs);
+const mergedUiPrefs = {
+  ...nextUiPrefs,
+  theme: nextUserPrefs.theme || nextUiPrefs.theme,
+  brandColor:
+    nextUserPrefs.primaryColor || nextUiPrefs.brandColor,
+};
 
-      applyUiPrefs(nextUiPrefs);
+setUiPrefs(mergedUiPrefs);
 
-      applyUserPrefs(getUserPrefs(currentEmail));
+applyUiPrefs(mergedUiPrefs);
+applyUserPrefs(nextUserPrefs);
     };
     const handleRefresh = (event) => {
       if (authState.status !== "authed") return;
@@ -280,18 +306,53 @@ export default function App() {
   }, [needsOnboarding]);
 
   useEffect(() => {
-    const handleUserPrefs = (event) => {
-      if (!event?.detail) return;
-      const currentEmail = authState.user?.email || "guest";
-      if ((event.detail.email || "guest") !== currentEmail) return;
-      const nextPrefs = event.detail.prefs || getUserPrefs(currentEmail);
-      applyUserPrefs(nextPrefs);
-      setLanguageVersion((current) => current + 1);
+  const handleUserPrefs = (event) => {
+    if (!event?.detail) return;
+
+    const currentEmail =
+      authState.user?.email || "guest";
+
+    const eventEmail =
+      event.detail.email || "guest";
+
+    // Không lấy nhầm tùy chỉnh của tài khoản khác
+    if (eventEmail !== currentEmail) return;
+
+    const nextUserPrefs =
+      event.detail.prefs || getUserPrefs(currentEmail);
+
+    const nextUiPrefs = getUiPrefs(currentEmail);
+
+    const mergedUiPrefs = {
+      ...nextUiPrefs,
+      theme:
+        nextUserPrefs.theme || nextUiPrefs.theme,
+      brandColor:
+        nextUserPrefs.primaryColor ||
+        nextUiPrefs.brandColor,
     };
-    window.addEventListener("finance:user-prefs", handleUserPrefs);
-    return () =>
-      window.removeEventListener("finance:user-prefs", handleUserPrefs);
-  }, [authState.user?.email]);
+
+    setUiPrefs(mergedUiPrefs);
+
+    // Thứ tự này không được đổi ngược lại
+    applyUiPrefs(mergedUiPrefs);
+    applyUserPrefs(nextUserPrefs);
+
+    setLanguageVersion((current) => current + 1);
+  };
+
+  window.addEventListener(
+    "finance:user-prefs",
+    handleUserPrefs,
+  );
+
+  return () => {
+    window.removeEventListener(
+      "finance:user-prefs",
+      handleUserPrefs,
+    );
+  };
+}, [authState.user?.email]);
 
   useEffect(() => {
     const email = authState.user?.email || "guest";

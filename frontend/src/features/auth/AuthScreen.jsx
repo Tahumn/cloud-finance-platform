@@ -548,15 +548,20 @@ export default function AuthScreen({
               {step === "login" && (
                 <form className="auth-form" onSubmit={handleLoginSubmit}>
                   <div className="auth-field-group">
-                    <label>{t("auth.identifier", null, "Email hoặc Username")}</label>
+                    <label>{t("auth.identifier", null, "Email")}</label>
                     <div className="auth-input-wrapper with-icon">
                       <span className="auth-input-icon left"><UserIcon /></span>
                       <input
-                        name="identifier"
-                        type="text"
-                        placeholder={t("auth.identifier_placeholder", null, "Nhập email hoặc username")}
-                        required
-                      />
+  name="identifier"
+  type="email"
+  placeholder={t(
+    "auth.identifier_placeholder",
+    null,
+    "Nhập email của bạn"
+  )}
+  autoComplete="email"
+  required
+/>
                     </div>
                   </div>
 

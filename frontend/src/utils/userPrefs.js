@@ -26,8 +26,18 @@ const normalizeFontScale = (value) => {
   if (value === "small" || value === "large") return value;
   return "medium";
 };
-const normalizeTextColorMode = (value) =>
-  value === "custom" ? "custom" : "auto";
+const normalizeTextColorMode = (value) => {
+  if (
+    value === "dark" ||
+    value === "light" ||
+    value === "gray" ||
+    value === "custom"
+  ) {
+    return value;
+  }
+
+  return "auto";
+};
 
 const normalizePrefs = (prefs = {}) => ({
   language: normalizeLanguage(prefs.language),
@@ -163,40 +173,62 @@ export const applyUserPrefs = (prefs) => {
   const normalized = normalizePrefs(prefs);
   const root = document.documentElement;
 
-  // Language
+  // 1. Ngôn ngữ
   root.dataset.lang = normalized.language;
   root.lang = normalized.language;
 
-  // Theme
+  // 2. Chế độ sáng/tối
   root.dataset.theme = normalized.theme;
 
-  // Primary color
-  root.style.setProperty(
-    "--primary-color",
-    normalized.primaryColor || "#2563eb",
-  );
+  // Lưu trạng thái để CSS có thể nhận biết
+  root.dataset.fontScale = normalized.fontScale;
+  root.dataset.textColorMode = normalized.textColorMode;
 
-  root.style.setProperty("--primary", normalized.primaryColor || "#2563eb");
+  // 3. Màu chủ đạo
+  const primaryColor =
+    normalized.primaryColor || DEFAULT_USER_PREFS.primaryColor;
 
-  // Font Scale
+  root.style.setProperty("--primary", primaryColor);
+  root.style.setProperty("--primary-color", primaryColor);
+
+  // 4. Cỡ chữ
   const fontScale =
     normalized.fontScale === "small"
-      ? 0.9
+      ? 0.92
       : normalized.fontScale === "large"
-        ? 1.1
+        ? 1.12
         : 1;
 
-  root.style.setProperty("--font-scale", fontScale);
+  root.style.setProperty("--font-scale", String(fontScale));
+  root.style.setProperty("--font-size-base", `${16 * fontScale}px`);
 
-  // Text color
+  // 5. Màu chữ
+  let textColor = "";
+
   if (normalized.textColorMode === "dark") {
-    root.style.setProperty("--text-color", "#111827");
+    textColor = "#111827";
   } else if (normalized.textColorMode === "light") {
-    root.style.setProperty("--text-color", "#ffffff");
+    textColor = "#f8fafc";
+  } else if (normalized.textColorMode === "gray") {
+    // Giá trị "gray" trong onboarding hiện đang đại diện cho Xanh dương
+    textColor = "#0062ff";
   } else if (normalized.textColorMode === "custom" && normalized.textColor) {
-    root.style.setProperty("--text-color", normalized.textColor);
+    textColor = normalized.textColor;
+  }
+
+  if (textColor) {
+    root.style.setProperty("--user-text-color", textColor);
+    root.style.setProperty("--text", textColor);
+    root.style.setProperty("--text-color", textColor);
+
+    // Những chữ xám phụ của Dashboard đang dùng biến --muted
+    root.style.setProperty("--muted", textColor);
   } else {
+    // Chế độ tự động: trả màu chữ về theo sáng/tối trong CSS
+    root.style.removeProperty("--user-text-color");
+    root.style.removeProperty("--text");
     root.style.removeProperty("--text-color");
+    root.style.removeProperty("--muted");
   }
 };
 

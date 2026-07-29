@@ -46,7 +46,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
     # Support JSON login for React clients.
     data = await request.json()
-    identifier = data.get("identifier") or data.get("email") or data.get("username")
+    identifier = data.get("identifier") or data.get("email")
     payload = schemas.UserLogin(identifier=identifier, password=data.get("password"))
     return service.authenticate_user(db, payload)
     

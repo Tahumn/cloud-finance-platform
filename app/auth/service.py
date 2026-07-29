@@ -76,57 +76,66 @@ def _create_and_send_email_otp(db: Session, db_user: User) -> str | None:
     return code if settings.dev_return_otp else None
 
 
-def start_register(db: Session, user: schemas.RegisterStartRequest) -> str | None:
+def start_register(
+    db: Session,
+    user: schemas.RegisterStartRequest,
+) -> str | None:
     full_name = user.full_name.strip()
+
     if not full_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Full name is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Full name is required",
+        )
 
     username = user.username.strip()
-    if not username:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is required")
 
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username is required",
+        )
+
+    # Số điện thoại là optional.
+    # Nếu người dùng không nhập thì giá trị sẽ là None.
+    # Không kiểm tra trùng số điện thoại.
     phone = _normalize_phone(user.phone)
 
-    existing_phone = None
-
-if phone:
-    existing_phone = (
+    # Chỉ kiểm tra trùng email.
+    existing_user = (
         db.query(User)
-        .filter(User.phone == phone)
+        .filter(User.email == user.email)
         .first()
     )
 
-    exists = db.query(User).filter(User.email == user.email).first()
-    if exists:
-        if existing_phone and existing_phone.id != exists.id:
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Phone already exists"
-    )
-        # If not yet verified, allow updating profile + resend OTP.
-        if exists.email_verified:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+    if existing_user:
+        # Email đã xác minh thì không được đăng ký lại.
+        if existing_user.email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already exists",
+            )
 
-
+        # Email tồn tại nhưng chưa xác minh:
+        # cập nhật thông tin và gửi lại mã OTP.
         first_name, last_name = _split_full_name(full_name)
-        exists.first_name = first_name
-        exists.last_name = last_name
-        exists.phone = phone
-        exists.username = username
-        # No password yet; prevent login until set_password marks the account active.
-        exists.hashed_password = hash_password(secrets.token_urlsafe(24))
-        exists.is_active = False
+
+        existing_user.first_name = first_name
+        existing_user.last_name = last_name
+        existing_user.username = username
+        existing_user.phone = phone
+        existing_user.hashed_password = hash_password(
+            secrets.token_urlsafe(24)
+        )
+        existing_user.is_active = False
+
         db.commit()
-        return _create_and_send_email_otp(db, exists)
+        db.refresh(existing_user)
 
+        return _create_and_send_email_otp(db, existing_user)
 
+    # Email chưa tồn tại: tạo tài khoản mới.
     first_name, last_name = _split_full_name(full_name)
-
-    if existing_phone:
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Phone already exists"
-    )
 
     db_user = User(
         email=user.email,
@@ -134,10 +143,13 @@ if phone:
         first_name=first_name,
         last_name=last_name,
         phone=phone,
-        hashed_password=hash_password(secrets.token_urlsafe(24)),
+        hashed_password=hash_password(
+            secrets.token_urlsafe(24)
+        ),
         email_verified=False,
         is_active=False,
     )
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -145,12 +157,22 @@ if phone:
     return _create_and_send_email_otp(db, db_user)
 
 
-def authenticate_user(db: Session, user: schemas.UserLogin) -> schemas.Token:
-    identifier = user.identifier.strip()
-    db_user = db.query(User).filter(
-        or_(User.email == identifier, User.username == identifier)
-    ).first()
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
+def authenticate_user(
+    db: Session,
+    user: schemas.UserLogin,
+) -> schemas.Token:
+    email = user.identifier.strip().lower()
+
+    db_user = (
+        db.query(User)
+        .filter(User.email == email)
+        .first()
+    )
+
+    if not db_user or not verify_password(
+        user.password,
+        db_user.hashed_password,
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -162,12 +184,16 @@ def authenticate_user(db: Session, user: schemas.UserLogin) -> schemas.Token:
             detail="Email is not verified",
         )
 
-    token = create_access_token(
+    access_token = create_access_token(
         subject=str(db_user.id),
         email=db_user.email,
-        is_active=bool(db_user.is_active),
+        is_active=db_user.is_active,
     )
-    return schemas.Token(access_token=token)
+
+    return schemas.Token(
+        access_token=access_token,
+        token_type="bearer",
+    )
 
 def google_login(db: Session, payload: schemas.GoogleLoginRequest) -> schemas.Token:
     idinfo = id_token.verify_oauth2_token(

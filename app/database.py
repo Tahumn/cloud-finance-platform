@@ -91,7 +91,32 @@ def ensure_schema() -> None:
     with engine.begin() as conn:
         for stmt in statements:
             conn.execute(text(stmt))
-        conn.execute(text(f"CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON {users} (username)"))
+
+        # Username và phone được phép trùng.
+        # Xóa unique index cũ và tạo lại index thường.
+        if DB_SCHEMA:
+            conn.execute(
+                text(f'DROP INDEX IF EXISTS "{DB_SCHEMA}"."ix_users_username"')
+            )
+            conn.execute(
+                text(f'DROP INDEX IF EXISTS "{DB_SCHEMA}"."ix_users_phone"')
+            )
+        else:
+            conn.execute(text("DROP INDEX IF EXISTS ix_users_username"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_users_phone"))
+
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS "
+                f"ix_users_username ON {users} (username)"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS "
+                f"ix_users_phone ON {users} (phone)"
+            )
+        )
 
     if "transactions" in tables:
         tx_existing = {col["name"] for col in inspector.get_columns("transactions", schema=DB_SCHEMA)}

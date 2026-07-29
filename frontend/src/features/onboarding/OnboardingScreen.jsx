@@ -5,7 +5,12 @@ import {
   saveUserPrefs,
   setOnboardingDone,
 } from "../../utils/userPrefs.js";
-import { saveUiPrefs, UI_COLORS, UI_LAYOUTS } from "../../utils/uiPrefs.js";
+import {
+  applyUiPrefs,
+  saveUiPrefs,
+  UI_COLORS,
+  UI_LAYOUTS,
+} from "../../utils/uiPrefs.js";
 import { t } from "../../utils/i18n.js";
 import {
   createCategory,
@@ -347,11 +352,15 @@ export default function OnboardingScreen({
 
       setOnboardingDone(userEmail, true);
 
-      // áp dụng ngay preferences vừa lưu
-      applyUserPrefs(prefs);
+// Áp dụng toàn bộ layout, theme và các màu phụ
+applyUiPrefs(uiPrefs);
 
-      // callback
-      onComplete();
+// Áp dụng cỡ chữ, màu chữ và màu chủ đạo chính xác
+applyUserPrefs(prefs);
+
+// Chuyển sang Dashboard
+onComplete();
+
     } catch (err) {
       setError(err?.message || "Đã có lỗi xảy ra. Vui lòng thử lại.");
     } finally {

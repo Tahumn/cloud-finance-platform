@@ -11,7 +11,7 @@
   --bg-grad-2: #f8f5f2;
   --bg-grad-3: #fefbf7;
   --text: #171717;
-  --muted: #6f6b67;
+  --muted:#52627a;
   --primary: #1565c0;
   --primary-dark: #0c418c;
   --accent: #ff8b5f;
@@ -41,9 +41,11 @@ html {
 }
 
 body {
-  margin: 0;
-  font-family: "Space Grotesk", "Segoe UI", sans-serif;
-  font-size: calc(16px * var(--font-scale));
+  margin:0;
+  font-family:"Space Grotesk","Segoe UI",sans-serif;
+
+  font-size:var(--font-size-base,16px);
+
   background: linear-gradient(
     180deg,
     var(--bg-grad-1) 0%,
@@ -10497,4 +10499,65 @@ body.tx-modal-open .mobile-nav-wrapper {
   height: 100%;
   opacity: 0;
   cursor: pointer;
+}
+
+.dashboard,
+.dashboard *,
+.page,
+.page *,
+.card,
+.card *,
+.panel,
+.panel * {
+  font-size: inherit;
+}
+
+/*
+ * Áp dụng màu chữ user chọn cho nội dung Dashboard và Sidebar.
+ * Không ghi đè màu trạng thái thu nhập, chi tiêu, cảnh báo...
+ */
+:root:not([data-text-color-mode="auto"]) .app-content
+  :where(
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    span,
+    small,
+    label,
+    strong,
+    td,
+    th,
+    li,
+    a,
+    input,
+    textarea,
+    select
+  ):not(
+    button *,
+    [class*="badge"],
+    [class*="status"],
+    [class*="income"],
+    [class*="expense"],
+    [class*="danger"],
+    [class*="success"]
+  ),
+:root:not([data-text-color-mode="auto"]) .sidebar
+  :where(
+    p,
+    span,
+    small,
+    label,
+    strong,
+    li,
+    a
+  ):not(
+    button *,
+    [class*="badge"],
+    [class*="status"]
+  ) {
+  color: var(--user-text-color) !important;
 }

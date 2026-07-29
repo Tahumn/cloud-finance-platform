@@ -7,29 +7,68 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    username = Column(String, index=True, nullable=True)
+
+    # Chỉ email không được phép trùng.
+    email = Column(
+        String,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    # Username được phép trùng.
+    username = Column(
+        String,
+        index=True,
+        nullable=True,
+    )
+
+    # Họ tên được phép trùng.
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
+
+    # Số điện thoại không bắt buộc và được phép trùng.
     phone = Column(
-    String,
-    unique=True,
-    index=True,
-    nullable=True
-)
-    hashed_password = Column(String, nullable=False)
+        String,
+        index=True,
+        nullable=True,
+    )
 
+    hashed_password = Column(
+        String,
+        nullable=False,
+    )
+
+    # Google ID là định danh từ Google nên vẫn phải duy nhất.
     google_id = Column(
-    String,
-    unique=True,
-    index=True,
-    nullable=True
-)
-    auth_provider = Column(String, default="local")
+        String,
+        unique=True,
+        index=True,
+        nullable=True,
+    )
 
-    email_verified = Column(Boolean, nullable=False, server_default="false")
-    is_active = Column(Boolean, nullable=False, server_default="false")
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    auth_provider = Column(
+        String,
+        default="local",
+    )
+
+    email_verified = Column(
+        Boolean,
+        nullable=False,
+        server_default="false",
+    )
+
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        server_default="false",
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 
 class EmailOTP(Base):
