@@ -19,6 +19,7 @@ import {
   createTag,
   createTransaction,
   deleteAccount,
+  deleteCategory,
   deleteTag,
   deleteTransaction,
   getCategoryBreakdown,
@@ -30,18 +31,22 @@ import {
   listBudgets,
   bootstrapFinance,
   createBudget,
+  createSavingsContribution,
   createSavingsGoal,
   updateAccount,
   updateBudget,
+  updateCategory,
   updateSavingsGoal,
   deleteBudget,
   deleteSavingsGoal,
+  listSavingsContributions,
   updateTag,
   updateTransaction,
   getChartData,
   getReportsOverview,
   listSavingsGoals,
   listBills,
+  listAccountHistory,
   createBill,
   updateBill,
   deleteBill
@@ -69,11 +74,12 @@ import BillsScreen from "./features/bills/BillsScreen.jsx";
 import FloatingChatbot from "./components/FloatingChatbot.jsx";
 import BottomNav from "./components/BottomNav.jsx";
 import { currency, toInputDate } from "./utils/format.js";
-import { applyUiPrefs, getUiPrefs } from "./utils/uiPrefs.js";
+import { applyUiPrefs, getUiPrefs, saveUiPrefs } from "./utils/uiPrefs.js";
 import {
   applyUserPrefs,
   getUserPrefs,
   isOnboardingDone,
+  saveUserPrefs,
   setActiveUserEmail,
   setOnboardingDone
 } from "./utils/userPrefs.js";
@@ -141,6 +147,11 @@ const defaultFilters = () => ({
   tagId: ""
 });
 
+const hasCompletedOnboarding = (user) => {
+  if (!user?.email) return false;
+  return Boolean(user.onboarding_completed || isOnboardingDone(user.email));
+};
+
 const getSocketBase = () => {
   if (import.meta.env.VITE_API_BASE) {
     return import.meta.env.VITE_API_BASE.replace(/\/api\/v1$/, "");
@@ -178,6 +189,7 @@ export default function App() {
   const [budgets, setBudgets] = useState([]);
   const [savingsGoals, setSavingsGoals] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [accountHistory, setAccountHistory] = useState([]);
   const [bills, setBills] = useState([]);
   const [reportsOverview, setReportsOverview] = useState({
     daily_series: [],
@@ -205,10 +217,36 @@ export default function App() {
   const bootstrapTriedRef = useRef(false);
 
   useEffect(() => {
-    const prefs = getUiPrefs(authState.user?.email);
-    setUiPrefs(prefs);
-    applyUiPrefs(prefs);
-  }, [authState.user?.email]);
+    const currentEmail = authState.user?.email || "guest";
+    const localUiPrefs = getUiPrefs(currentEmail);
+    const nextUiPrefs = authState.user
+      ? {
+          ...localUiPrefs,
+          theme: authState.user.theme_preference || localUiPrefs.theme,
+          templateId: authState.user.layout_preference || localUiPrefs.templateId,
+          brandColor: authState.user.brand_color || localUiPrefs.brandColor,
+        }
+      : localUiPrefs;
+
+    setUiPrefs(nextUiPrefs);
+    saveUiPrefs(currentEmail, nextUiPrefs);
+    applyUiPrefs(nextUiPrefs);
+
+    if (authState.user) {
+      const nextUserPrefs = {
+        ...getUserPrefs(currentEmail),
+        language: authState.user.language_preference || "vi",
+      };
+      saveUserPrefs(currentEmail, nextUserPrefs);
+      applyUserPrefs(nextUserPrefs);
+    }
+  }, [
+    authState.user?.email,
+    authState.user?.theme_preference,
+    authState.user?.layout_preference,
+    authState.user?.brand_color,
+    authState.user?.language_preference,
+  ]);
 
   useEffect(() => {
     const handlePrefs = (event) => {
@@ -402,7 +440,8 @@ export default function App() {
       const user = await me();
       setAuthState({ status: "authed", user });
       setActiveUserEmail(user?.email || "guest");
-      const hasOnboarded = isOnboardingDone(user?.email);
+      const hasOnboarded = hasCompletedOnboarding(user);
+      setOnboardingDone(user?.email, hasOnboarded);
       setNeedsOnboarding(!hasOnboarded);
       setView(hasOnboarded ? "dashboard" : "onboarding");
       return { next: "authed" };
@@ -428,7 +467,8 @@ export default function App() {
       const user = await me();
       setAuthState({ status: "authed", user });
       setActiveUserEmail(user?.email || "guest");
-      const hasOnboarded = isOnboardingDone(user?.email);
+      const hasOnboarded = hasCompletedOnboarding(user);
+      setOnboardingDone(user?.email, hasOnboarded);
       setNeedsOnboarding(!hasOnboarded);
       setView(hasOnboarded ? "dashboard" : "onboarding");
       return { next: "authed" };
@@ -526,12 +566,30 @@ export default function App() {
     setNotice("");
     try {
       await resendOtp(email);
-      setNotice(t("auth.notice.otp_resent", null, "Mã OTP đã được gửi lại"));
+      setNotice(t("auth.notice.otp_resent", null, "M?? OTP ???? ???????c g???i l???i"));
     } catch (err) {
-      setError(err.message || t("auth.error.otp_resend", null, "Không thể gửi lại mã OTP"));
+      setError(err.message || t("auth.error.otp_resend", null, "Kh??ng th??? g???i l???i m?? OTP"));
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  const fetchAllTransactions = async (baseParams) => {
+    const limit = 200;
+    let offset = 0;
+    let total = 0;
+    let items = [];
+
+    while (true) {
+      const page = await listTransactions({ ...baseParams, limit, offset });
+      const pageItems = Array.isArray(page?.items) ? page.items : [];
+      total = Number(page?.total || 0);
+      items = items.concat(pageItems);
+      if (!pageItems.length || items.length >= total) break;
+      offset += pageItems.length;
+    }
+
+    return { items, total: total || items.length };
   };
 
   const loadFinanceData = async () => {
@@ -542,9 +600,7 @@ export default function App() {
         start_date: filters.start,
         end_date: filters.end,
         category_id: filters.categoryId || undefined,
-        transaction_type: filters.type || undefined,
-        limit: 20,
-        offset: 0
+        transaction_type: filters.type || undefined
       };
       const safeFetch = async (promise, fallback) => {
         try {
@@ -565,6 +621,7 @@ export default function App() {
         chartData,
         budgetsData,
         accountsData,
+        accountHistoryData,
         billsData,
         goalsData,
         anomalyData,
@@ -573,14 +630,15 @@ export default function App() {
       ] = await Promise.all([
         safeFetch(listCategories(), []),
         safeFetch(listTags(), []),
-        safeFetch(listTransactions(params), { items: [], total: 0 }),
+        safeFetch(fetchAllTransactions(params), { items: [], total: 0 }),
         safeFetch(getSummary({ start_date: filters.start, end_date: filters.end }), { income: 0, expense: 0, balance: 0 }),
         safeFetch(getCategoryBreakdown({ start_date: filters.start, end_date: filters.end, transaction_type: "expense" }), []),
         safeFetch(getCategoryBreakdown({ start_date: filters.start, end_date: filters.end, transaction_type: "income" }), []),
         safeFetch(getChartData({ limit_months: 6 }), { series: [] }),
         safeFetch(listBudgets({ start_date: filters.start, end_date: filters.end }), []),
         safeFetch(listAccounts(), []),
-        safeFetch(listBills(), []),
+        safeFetch(listAccountHistory(), []),
+        safeFetch(listBills({ start_date: filters.start, end_date: filters.end }), []),
         safeFetch(listSavingsGoals(), []),
         safeFetch(getAnomalies(), { alerts: [] }),
         safeFetch(getSavingsTips(), []),
@@ -595,6 +653,7 @@ export default function App() {
       setMonthlySeries(chartData?.series || []);
       setBudgets(Array.isArray(budgetsData) ? budgetsData : []);
       setAccounts(Array.isArray(accountsData) ? accountsData : []);
+      setAccountHistory(Array.isArray(accountHistoryData) ? accountHistoryData : []);
       setSavingsGoals(Array.isArray(goalsData) ? goalsData : []);
       setBills(Array.isArray(billsData) ? billsData : []);
       setAnomalies(anomalyData?.alerts || []);
@@ -635,30 +694,7 @@ export default function App() {
     }
   };
 
-  const handleLoadMoreTransactions = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const currentCount = transactions.items.length;
-      const params = {
-        start_date: filters.start,
-        end_date: filters.end,
-        category_id: filters.categoryId || undefined,
-        transaction_type: filters.type || undefined,
-        limit: 20,
-        offset: currentCount
-      };
-      const moreTxs = await listTransactions(params);
-      setTransactions((prev) => ({
-        items: [...prev.items, ...moreTxs.items],
-        total: moreTxs.total
-      }));
-    } catch (err) {
-      console.error("Failed to load more transactions:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleLoadMoreTransactions = async () => undefined;
 
   const scheduleRefresh = useCallback((delay = 250) => {
     if (authStatusRef.current !== "authed" || needsOnboardingRef.current) return;
@@ -715,7 +751,8 @@ export default function App() {
         const user = await me();
         setAuthState({ status: "authed", user });
         setActiveUserEmail(user?.email || "guest");
-        const hasOnboarded = isOnboardingDone(user?.email);
+        const hasOnboarded = hasCompletedOnboarding(user);
+        setOnboardingDone(user?.email, hasOnboarded);
         setNeedsOnboarding(!hasOnboarded);
         if (!hasOnboarded) setView("onboarding");
       } catch {
@@ -858,10 +895,38 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      await createCategory(name);
+      const created = await createCategory(name);
       await loadFinanceData();
+      return created;
     } catch (err) {
       setError(err.message || t("finance.error.create_category"));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateCategory = async (categoryId, payload) => {
+    setLoading(true);
+    setError("");
+    try {
+      await updateCategory(categoryId, payload);
+      await loadFinanceData();
+    } catch (err) {
+      setError(err.message || t("common.error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    setLoading(true);
+    setError("");
+    try {
+      await deleteCategory(categoryId);
+      await loadFinanceData();
+    } catch (err) {
+      setError(err.message || t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -978,6 +1043,21 @@ export default function App() {
     }
   };
 
+
+  const handleCreateSavingsContribution = async (goalId, payload) => {
+    setLoading(true);
+    setError("");
+    try {
+      await createSavingsContribution(goalId, payload);
+      await loadFinanceData();
+    } catch (err) {
+      setError(err.message || t("common.error"));
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteSavingsGoal = async (goalId) => {
     setLoading(true);
     setError("");
@@ -1082,7 +1162,10 @@ export default function App() {
         <OnboardingScreen
           userEmail={authState.user?.email}
           currentUiPrefs={uiPrefs}
-          onComplete={() => {
+          onComplete={(updatedUser) => {
+            if (updatedUser) {
+              setAuthState((current) => ({ ...current, user: updatedUser }));
+            }
             setOnboardingDone(authState.user?.email, true);
             setNeedsOnboarding(false);
             setView("dashboard");
@@ -1184,6 +1267,8 @@ export default function App() {
             onUpdate={handleUpdateTransaction}
             onDelete={handleDeleteTransaction}
             onCreateCategory={handleCreateCategory}
+            onUpdateCategory={handleUpdateCategory}
+            onDeleteCategory={handleDeleteCategory}
             onCreateTag={handleCreateTag}
             onUpdateTag={handleUpdateTag}
             onDeleteTag={handleDeleteTag}
@@ -1201,6 +1286,8 @@ export default function App() {
           <CategoriesScreen
             categories={categories}
             onCreate={handleCreateCategory}
+            onUpdate={handleUpdateCategory}
+            onDelete={handleDeleteCategory}
             onBack={() => handleChangeView("dashboard")}
             loading={loading}
             userEmail={authState.user?.email}
@@ -1224,6 +1311,11 @@ export default function App() {
             breakdown={breakdownWithShare}
             transactions={transactionsWithLabels}
             reportsOverview={reportsOverview}
+            savingsGoals={savingsGoals}
+            filters={filters}
+            onFiltersChange={setFilters}
+            accounts={accounts}
+            categories={categories}
             userEmail={authState.user?.email}
             onBack={() => handleChangeView("dashboard")}
           />
@@ -1251,6 +1343,8 @@ export default function App() {
             onCreateGoal={handleCreateSavingsGoal}
             onUpdateGoal={handleUpdateSavingsGoal}
             onDeleteGoal={handleDeleteSavingsGoal}
+            onCreateContribution={handleCreateSavingsContribution}
+            onListContributions={listSavingsContributions}
             loading={loading}
           />
         )}
@@ -1274,6 +1368,7 @@ export default function App() {
         {view === "accounts" && (
           <AccountsScreen
             accounts={accounts}
+            history={accountHistory}
             onCreateAccount={handleCreateAccount}
             onUpdateAccount={handleUpdateAccount}
             onDeleteAccount={handleDeleteAccount}
@@ -1281,7 +1376,7 @@ export default function App() {
           />
         )}
 
-        {view === "settings" && <SettingsScreen user={authState.user} />}
+        {view === "settings" && <SettingsScreen user={authState.user} onUserUpdated={(user) => setAuthState({ status: "authed", user })} />}
 
         {view === "chat" && <ChatScreen userEmail={authState.user?.email} />}
 
@@ -1304,6 +1399,7 @@ export default function App() {
             loading={loading}
             onGoOcr={() => handleChangeView("ocr")}
             onCreateTransaction={handleCreateTransaction}
+            onCreateBill={handleCreateBill}
             onUpdateBill={handleUpdateBill}
             onDeleteBill={handleDeleteBill}
           />

@@ -90,6 +90,17 @@ def _validate_password_strength(password: str) -> None:
             detail="Password must include a number or special character",
         )
 
+VALID_LANGUAGE_PREFERENCES = {"vi", "en"}
+VALID_THEME_PREFERENCES = {"light", "dark", "system"}
+VALID_LAYOUT_PREFERENCES = {"classic", "airy", "compact", "editorial"}
+
+
+def _validate_preference_value(value: str, *, allowed: set[str], field_label: str) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized not in allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid {field_label}")
+    return normalized
+
 def _create_and_send_email_otp(db: Session, db_user: User) -> str | None:
     code = f"{secrets.randbelow(1_000_000):06d}"
     salt = secrets.token_hex(16)
@@ -442,3 +453,65 @@ def password_reset_confirm(db: Session, payload: schemas.PasswordResetConfirmReq
     db.commit()
     return {"message": "Password reset"}
 
+
+
+def update_profile(db: Session, current_user: User, payload: schemas.UserUpdate) -> User:
+    data = payload.model_dump(exclude_unset=True)
+    if "full_name" in data and data.get("full_name") is not None:
+        full_name = data["full_name"].strip()
+        if not full_name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Full name is required")
+        first_name, last_name = _split_full_name(full_name)
+        current_user.first_name = first_name
+        current_user.last_name = last_name
+    if "username" in data and data.get("username") is not None:
+        username = data["username"].strip()
+        if not username:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is required")
+        exists = db.query(User).filter(User.username == username, User.id != current_user.id).first()
+        if exists:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+        current_user.username = username
+    if "phone" in data:
+        current_user.phone = _normalize_phone(data.get("phone"))
+    if "language_preference" in data and data.get("language_preference") is not None:
+        current_user.language_preference = _validate_preference_value(
+            data["language_preference"], allowed=VALID_LANGUAGE_PREFERENCES, field_label="language preference"
+        )
+    if "theme_preference" in data and data.get("theme_preference") is not None:
+        current_user.theme_preference = _validate_preference_value(
+            data["theme_preference"], allowed=VALID_THEME_PREFERENCES, field_label="theme preference"
+        )
+    if "layout_preference" in data and data.get("layout_preference") is not None:
+        current_user.layout_preference = _validate_preference_value(
+            data["layout_preference"], allowed=VALID_LAYOUT_PREFERENCES, field_label="layout preference"
+        )
+    if "brand_color" in data and data.get("brand_color") is not None:
+        current_user.brand_color = data["brand_color"].strip()
+    if "onboarding_completed" in data and data.get("onboarding_completed") is not None:
+        current_user.onboarding_completed = bool(data["onboarding_completed"])
+    for field in (
+        "push_notifications",
+        "email_notifications",
+        "threshold_alerts",
+        "cloud_sync",
+        "ai_opt_in",
+        "keep_prompt_logs",
+        "estimated_monthly_cost",
+    ):
+        if field in data and data.get(field) is not None:
+            setattr(current_user, field, data[field])
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+def change_password(db: Session, current_user: User, payload: schemas.ChangePasswordRequest) -> dict:
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different")
+    _validate_password_strength(payload.new_password)
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password changed"}

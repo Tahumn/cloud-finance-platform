@@ -87,6 +87,54 @@ def ensure_schema() -> None:
         statements.append(
             f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
         )
+    if "push_notifications" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS push_notifications BOOLEAN NOT NULL DEFAULT TRUE"
+        )
+    if "email_notifications" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN NOT NULL DEFAULT TRUE"
+        )
+    if "threshold_alerts" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS threshold_alerts BOOLEAN NOT NULL DEFAULT TRUE"
+        )
+    if "cloud_sync" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS cloud_sync BOOLEAN NOT NULL DEFAULT FALSE"
+        )
+    if "ai_opt_in" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS ai_opt_in BOOLEAN NOT NULL DEFAULT TRUE"
+        )
+    if "keep_prompt_logs" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS keep_prompt_logs BOOLEAN NOT NULL DEFAULT TRUE"
+        )
+    if "estimated_monthly_cost" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS estimated_monthly_cost INTEGER NOT NULL DEFAULT 3"
+        )
+    if "language_preference" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS language_preference VARCHAR NOT NULL DEFAULT 'vi'"
+        )
+    if "theme_preference" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS theme_preference VARCHAR NOT NULL DEFAULT 'light'"
+        )
+    if "layout_preference" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS layout_preference VARCHAR NOT NULL DEFAULT 'classic'"
+        )
+    if "brand_color" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS brand_color VARCHAR NOT NULL DEFAULT '#2e6bd1'"
+        )
+    if "onboarding_completed" not in user_columns:
+        statements.append(
+            f"ALTER TABLE {users} ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE"
+        )
 
     with engine.begin() as conn:
         for stmt in statements:

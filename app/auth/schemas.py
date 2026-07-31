@@ -1,12 +1,12 @@
-from pydantic import BaseModel, EmailStr, Field
-from pydantic import ConfigDict
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class RegisterStartRequest(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=100)
     username: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    # Allow digits with optional + and spaces/dashes; normalize later.
     phone: str | None = Field(default=None, pattern=r"^\+?[\d\s-]{6,20}$")
 
 
@@ -26,7 +26,43 @@ class UserRead(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     phone: str | None = None
+    push_notifications: bool = True
+    email_notifications: bool = True
+    threshold_alerts: bool = True
+    cloud_sync: bool = False
+    ai_opt_in: bool = True
+    keep_prompt_logs: bool = True
+    estimated_monthly_cost: int = 3
+    language_preference: str = "vi"
+    theme_preference: str = "light"
+    layout_preference: str = "classic"
+    brand_color: str = "#2e6bd1"
+    onboarding_completed: bool = False
+    created_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=1, max_length=100)
+    username: str | None = Field(default=None, min_length=1, max_length=100)
+    phone: str | None = Field(default=None, pattern=r"^\+?[\d\s-]{6,20}$")
+    push_notifications: bool | None = None
+    email_notifications: bool | None = None
+    threshold_alerts: bool | None = None
+    cloud_sync: bool | None = None
+    ai_opt_in: bool | None = None
+    keep_prompt_logs: bool | None = None
+    estimated_monthly_cost: int | None = None
+    language_preference: str | None = Field(default=None, min_length=2, max_length=5)
+    theme_preference: str | None = Field(default=None, min_length=4, max_length=10)
+    layout_preference: str | None = Field(default=None, min_length=4, max_length=24)
+    brand_color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    onboarding_completed: bool | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
 
 
 class Token(BaseModel):
@@ -73,4 +109,3 @@ class VerifyOtpResponse(BaseModel):
 class SetPasswordRequest(BaseModel):
     registration_token: str
     password: str = Field(..., min_length=8)
-
