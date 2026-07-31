@@ -1,13 +1,16 @@
-import { currency, formatDateFull, formatTime } from "../utils/format.js";
+﻿import { currency, formatDateFull, formatTime } from "../utils/format.js";
 import { colorFor, onColor } from "../utils/colors.js";
 import { getCategoryPrefs } from "../utils/userPrefs.js";
+import { renderStoredCategoryIcon } from "../utils/categoryVisuals.jsx";
 
 export default function TransactionRow({ item, categoryLabel, userEmail }) {
   const displayCategory = categoryLabel || "Không danh mục";
   const categoryName = categoryLabel || "";
   const hasCategory = Boolean(item.category_id) && Boolean(categoryName);
   const categoryPrefs = getCategoryPrefs(userEmail);
-  const icon = (hasCategory && categoryPrefs[categoryName]?.icon) || "🏷️";
+  const icon = hasCategory
+    ? renderStoredCategoryIcon(categoryPrefs[categoryName], { size: 15 })
+    : renderStoredCategoryIcon(null, { size: 15, fallback: "tag" });
   const bg = hasCategory ? colorFor(categoryName, userEmail) : "";
   const fg = hasCategory ? onColor(bg) : "";
   const time = formatTime(item.date);

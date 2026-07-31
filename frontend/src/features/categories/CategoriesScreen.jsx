@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { colorFor, onColor } from "../../utils/colors.js";
 import { getCategoryPrefs } from "../../utils/userPrefs.js";
 import { t } from "../../utils/i18n.js";
+import { renderStoredCategoryIcon } from "../../utils/categoryVisuals.jsx";
 
 export default function CategoriesScreen({
   categories,
   onCreate,
+  onUpdate,
+  onDelete,
   onBack,
   loading,
   userEmail,
@@ -14,13 +18,36 @@ export default function CategoriesScreen({
   onToggle
 }) {
   const categoryPrefs = getCategoryPrefs(userEmail);
-  const handleCreate = (event) => {
+  const [categoryName, setCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+
+  const resetForm = () => {
+    setCategoryName("");
+    setEditingCategoryId(null);
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = form.get("name").trim();
+    const name = categoryName.trim();
     if (!name) return;
-    onCreate(name);
-    event.currentTarget.reset();
+    if (editingCategoryId) {
+      await onUpdate?.(editingCategoryId, { name });
+    } else {
+      await onCreate?.(name);
+    }
+    resetForm();
+  };
+
+  const startEdit = (category) => {
+    setEditingCategoryId(category.id);
+    setCategoryName(category.name || "");
+  };
+
+  const handleDelete = async (category) => {
+    if (!onDelete) return;
+    if (!window.confirm(`X?a danh m?c "${category.name}"?`)) return;
+    await onDelete(category.id);
+    if (editingCategoryId === category.id) resetForm();
   };
 
   return (
@@ -56,13 +83,27 @@ export default function CategoriesScreen({
       </div>
       {!collapsed && (
         <>
-          <form className="form" onSubmit={handleCreate}>
+          <form className="form" onSubmit={handleSubmit}>
             <div className="row">
-              <input name="name" type="text" placeholder={t("categories.input")} required />
+              <input
+                name="name"
+                type="text"
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+                placeholder={t("categories.input")}
+                required
+              />
               <button className="primary" type="submit" disabled={loading}>
-                {t("categories.add")}
+                {editingCategoryId ? t("common.save") : t("categories.add")}
               </button>
             </div>
+            {editingCategoryId && (
+              <div className="row-actions">
+                <button className="ghost" type="button" onClick={resetForm}>
+                  H?y
+                </button>
+              </div>
+            )}
           </form>
           {categories.length === 0 ? (
             <p className="empty">{t("categories.empty")}</p>
@@ -77,7 +118,7 @@ export default function CategoriesScreen({
                     style={{ "--pill-bg": bg, "--pill-fg": onColor(bg) }}
                   >
                     <span className="pill-icon" aria-hidden="true">
-                      {categoryPrefs[category.name]?.icon || "🏷️"}
+                      {renderStoredCategoryIcon(categoryPrefs[category.name], { size: 14 })}
                     </span>
                     <span className="pill-text">{category.name}</span>
                   </div>
@@ -90,10 +131,18 @@ export default function CategoriesScreen({
                 <div key={category.id} className="item-row">
                   <div className="category-row">
                     <span className="dot" style={{ background: colorFor(category.name, userEmail) }} />
-                    {categoryPrefs[category.name]?.icon && (
-                      <span className="tag-chip">{categoryPrefs[category.name].icon}</span>
+                    {categoryPrefs[category.name] && (
+                      <span className="tag-chip">{renderStoredCategoryIcon(categoryPrefs[category.name], { size: 14 })}</span>
                     )}
                     <p>{category.name}</p>
+                  </div>
+                  <div className="row-actions">
+                    <button className="ghost" type="button" onClick={() => startEdit(category)}>
+                      S?a
+                    </button>
+                    <button className="ghost danger" type="button" onClick={() => handleDelete(category)}>
+                      X?a
+                    </button>
                   </div>
                 </div>
               ))}
