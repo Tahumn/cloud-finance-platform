@@ -37,7 +37,8 @@ export default function TagsScreen({
     setTagForm({ name: tag.name, color: tag.color });
   };
 
-  const removeTag = (id) => {
+  const removeTag = (id, name) => {
+    if (!window.confirm(`X?a nh?n "${name}"?`)) return;
     onDelete?.(id);
     if (editingTagId === id) {
       setEditingTagId(null);
@@ -140,7 +141,7 @@ export default function TagsScreen({
                   <button
                     className="tag-pill-remove"
                     type="button"
-                    onClick={() => removeTag(tag.id)}
+                    onClick={() => removeTag(tag.id, tag.name)}
                     aria-label={`${t("tags.action.delete")} ${tag.name}`}
                   >
                     ×

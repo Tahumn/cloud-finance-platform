@@ -82,6 +82,20 @@ const IcMore = () => (
     <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
   </svg>
 );
+const IcEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+const IcTrash = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" />
+    <path d="M8 6V4h8v2" />
+    <path d="M19 6l-1 14H6L5 6" />
+    <path d="M10 11v6M14 11v6" />
+  </svg>
+);
 const IcClose = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <path d="M18 6L6 18M6 6l12 12" />
@@ -363,6 +377,8 @@ export default function TransactionsScreen({
   onUpdate,
   onDelete,
   onCreateCategory,
+  onUpdateCategory,
+  onDeleteCategory,
   onCreateTag,
   onUpdateTag,
   onDeleteTag,
@@ -390,6 +406,7 @@ export default function TransactionsScreen({
   const [showAllTips, setShowAllTips] = useState(false);
   const [showAllCatsMobile, setShowAllCatsMobile] = useState(false);
   const [showAllTagsMobile, setShowAllTagsMobile] = useState(false);
+  const [rowMenuTxId, setRowMenuTxId] = useState(null);
 
   /* desktop layout toggle */
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
@@ -435,6 +452,10 @@ export default function TransactionsScreen({
   /* add tag modal state */
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#ec4899");
+  const [editingCategoryTarget, setEditingCategoryTarget] = useState(null);
+  const [deletingCategoryTarget, setDeletingCategoryTarget] = useState(null);
+  const [editingTagTarget, setEditingTagTarget] = useState(null);
+  const [deletingTagTarget, setDeletingTagTarget] = useState(null);
 
   /* sidebar category pagination + sort */
   const [catSort, setCatSort] = useState("pct"); // "az" | "pct"
@@ -632,10 +653,37 @@ export default function TransactionsScreen({
       date: form.get("date"),
       tag_ids: editTagIds,
     });
-    setEditingTx(null); setActiveModal(null);
+    setEditingTx(null); setActiveModal(null); setRowMenuTxId(null);
   };
 
   /* ─── RENDER DESKTOP ─── */
+  const handleQuickEditCategory = (category) => {
+    if (!category || !onUpdateCategory) return;
+    setEditingCategoryTarget(category);
+    setNewCatName(category.name || "");
+    setActiveModal("editCategory");
+  };
+
+  const handleQuickDeleteCategory = (category) => {
+    if (!category || !onDeleteCategory) return;
+    setDeletingCategoryTarget(category);
+    setActiveModal("deleteCategory");
+  };
+
+  const handleQuickEditTag = (tag) => {
+    if (!tag || !onUpdateTag) return;
+    setEditingTagTarget(tag);
+    setNewTagName(tag.name || "");
+    setNewTagColor(tag.color || "#ec4899");
+    setActiveModal("editTag");
+  };
+
+  const handleQuickDeleteTag = (tag) => {
+    if (!tag || !onDeleteTag) return;
+    setDeletingTagTarget(tag);
+    setActiveModal("deleteTag");
+  };
+
   const renderDesktop = () => {
     // 1. Group filtered/sorted transactions by Category
     const grouped = {};
@@ -762,6 +810,7 @@ export default function TransactionsScreen({
                       {pageCats.map(({ name, amt }) => {
                         const meta = getCatMeta(name);
                         const pct = (Math.abs(amt) / maxAmt * 100).toFixed(1);
+                        const category = categories.find((item) => item.name === name);
                         return (
                           <div
                             key={name}
@@ -776,6 +825,12 @@ export default function TransactionsScreen({
                               <div className="txd-cip-amt">{currency(Math.abs(amt))}</div>
                             </div>
                             <div className="txd-cip-pct">{pct}%</div>
+                            {category && (
+                              <div className="txd-inline-actions" onClick={(e) => e.stopPropagation()}>
+                                <button type="button" className="txd-inline-action" onClick={() => handleQuickEditCategory(category)} title="S?a danh m?c"><IcEdit /></button>
+                                <button type="button" className="txd-inline-action danger" onClick={() => handleQuickDeleteCategory(category)} title="Xoa danh muc"><IcTrash /></button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -825,17 +880,22 @@ export default function TransactionsScreen({
                     <>
                       <div className="txd-tags-wrap">
                         {pageTags.map(tag => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            className={`txd-tag-pill ${tagFilter === String(tag.id) ? "active" : ""}`}
-                            style={tagFilter === String(tag.id)
-                              ? { background: tag.color, color: "#fff", borderColor: tag.color }
-                              : { borderColor: tag.color, color: tag.color }}
-                            onClick={() => setTagFilter(tagFilter === String(tag.id) ? "" : String(tag.id))}
-                          >
-                            {tag.name}
-                          </button>
+                          <div key={tag.id} className="txd-tag-item-wrap">
+                            <button
+                              type="button"
+                              className={`txd-tag-pill ${tagFilter === String(tag.id) ? "active" : ""}`}
+                              style={tagFilter === String(tag.id)
+                                ? { background: tag.color, color: "#fff", borderColor: tag.color }
+                                : { borderColor: tag.color, color: tag.color }}
+                              onClick={() => setTagFilter(tagFilter === String(tag.id) ? "" : String(tag.id))}
+                            >
+                              {tag.name}
+                            </button>
+                            <div className="txd-inline-actions">
+                              <button type="button" className="txd-inline-action" onClick={() => handleQuickEditTag(tag)} title="S?a nh?n"><IcEdit /></button>
+                              <button type="button" className="txd-inline-action danger" onClick={() => handleQuickDeleteTag(tag)} title="Xoa nhan"><IcTrash /></button>
+                            </div>
+                          </div>
                         ))}
                         {tags.length === 0 && <p className="txd-tags-empty">Chưa có nhãn nào</p>}
                       </div>
@@ -962,7 +1022,7 @@ export default function TransactionsScreen({
                             let sourceClass = acc ? (acc.type === "credit" ? "bank" : "ewallet") : "cash";
 
                             return (
-                              <div key={tx.id || tx.description} className={`txd-list-row ${newlyCreatedId === tx.id ? "new-item-flash" : ""}`} onClick={() => setSelectedTx(tx)}>
+                              <div key={tx.id || tx.description} className={`txd-list-row ${newlyCreatedId === tx.id ? "new-item-flash" : ""}`} onClick={() => { setSelectedTx(tx); setActiveModal("detail"); setRowMenuTxId(null); }}>
                                 <div className="lr-col main">
                                   <div className="lr-icon" style={{ background: txMeta.bg, color: "#fff" }}><txMeta.SvgIcon size={14} /></div>
                                   <span className="lr-title">
@@ -987,7 +1047,25 @@ export default function TransactionsScreen({
                                 </div>
                                 <div className={`lr-col amount ${isIncome ? "income" : "expense"}`}>
                                   {isIncome ? "+" : "-"}{currency(Math.abs(tx.amount))}
-                                  <button className="lr-more-btn" onClick={(e) => { e.stopPropagation(); setEditingTx(tx); }}>...</button>
+                                  <div className="lr-more-wrap" onClick={(e) => e.stopPropagation()}>
+                                    <button className="lr-more-btn" onClick={() => setRowMenuTxId((current) => current === tx.id ? null : tx.id)}><IcMore /></button>
+                                    {rowMenuTxId === tx.id && (
+                                      <div className="lr-more-menu">
+                                        <button type="button" onClick={() => { setEditingTx(tx); setActiveModal("edit"); setRowMenuTxId(null); }}>S?a</button>
+                                        <button
+                                          type="button"
+                                          className="danger"
+                                          onClick={() => {
+                                            if (!window.confirm("Xóa giao dịch này?")) return;
+                                            onDelete(tx.id);
+                                            setRowMenuTxId(null);
+                                          }}
+                                        >
+                                          Xóa
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -1480,6 +1558,97 @@ export default function TransactionsScreen({
         </div>
       )}
 
+      {/* --- EDIT CATEGORY MODAL --- */}
+      {activeModal === "editCategory" && editingCategoryTarget && (
+        <div className="txm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setActiveModal(null); setEditingCategoryTarget(null); } }}>
+          <div className="txm-dialog txm-dialog-sm">
+            <div className="txm-dialog-header">
+              <h3>Chỉnh sửa danh mục</h3>
+              <button className="txm-close-btn" type="button" onClick={() => { setActiveModal(null); setEditingCategoryTarget(null); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="txm-body">
+              <div className="txm-field">
+                <label>Tên danh mục</label>
+                <input
+                  className="txm-input"
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Ví dụ: Ăn uống"
+                />
+              </div>
+              <div className="txm-field">
+                <label>Xem trước</label>
+                <div className="txm-preview txm-preview-compact">
+                  <div className="txm-preview-icon" style={{ background: newCatColor + "20", color: newCatColor }}>
+                    <IcEdit />
+                  </div>
+                  <div>
+                    <span className="txm-preview-name">{newCatName || editingCategoryTarget.name}</span>
+                    <p className="txm-helper-text">Đổi tên sẽ cập nhật ngay ở danh sách giao dịch và bộ lọc.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="txm-footer">
+              <button className="txm-btn-cancel" type="button" onClick={() => { setActiveModal(null); setEditingCategoryTarget(null); }}>Hủy</button>
+              <button
+                className="txm-btn-save"
+                type="button"
+                disabled={!newCatName.trim() || loading}
+                onClick={async () => {
+                  const trimmed = newCatName.trim();
+                  if (!trimmed || !editingCategoryTarget || !onUpdateCategory) return;
+                  await onUpdateCategory(editingCategoryTarget.id, { name: trimmed });
+                  setEditingCategoryTarget(null);
+                  setNewCatName("");
+                  setActiveModal(null);
+                }}
+              >Lưu thay đổi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- DELETE CATEGORY MODAL --- */}
+      {activeModal === "deleteCategory" && deletingCategoryTarget && (
+        <div className="txm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setActiveModal(null); setDeletingCategoryTarget(null); } }}>
+          <div className="txm-dialog txm-dialog-sm">
+            <div className="txm-dialog-header">
+              <h3>Xóa danh mục</h3>
+              <button className="txm-close-btn" type="button" onClick={() => { setActiveModal(null); setDeletingCategoryTarget(null); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="txm-body">
+              <div className="txm-confirm-card danger">
+                <div className="txm-confirm-icon danger"><IcTrash /></div>
+                <div className="txm-confirm-copy">
+                  <strong>{deletingCategoryTarget.name}</strong>
+                  <p>Danh mục sẽ bị xóa khỏi danh sách. Các giao dịch cũ sẽ được giữ lại nhưng không còn gắn danh mục này.</p>
+                </div>
+              </div>
+            </div>
+            <div className="txm-footer">
+              <button className="txm-btn-cancel" type="button" onClick={() => { setActiveModal(null); setDeletingCategoryTarget(null); }}>Giữ lại</button>
+              <button
+                className="txm-btn-danger"
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  if (!deletingCategoryTarget || !onDeleteCategory) return;
+                  await onDeleteCategory(deletingCategoryTarget.id);
+                  setDeletingCategoryTarget(null);
+                  setActiveModal(null);
+                }}
+              >Xóa danh mục</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- ADD TAG MODAL --- */}
       {activeModal === "addTag" && (
         <div className="txm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setActiveModal(null); }}>
@@ -1542,6 +1711,106 @@ export default function TransactionsScreen({
                   setNewTagName(""); setActiveModal(null);
                 }}
               >Lưu nhãn</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- EDIT TAG MODAL --- */}
+      {activeModal === "editTag" && editingTagTarget && (
+        <div className="txm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setActiveModal(null); setEditingTagTarget(null); } }}>
+          <div className="txm-dialog txm-dialog-sm">
+            <div className="txm-dialog-header">
+              <h3>Chỉnh sửa nhãn</h3>
+              <button className="txm-close-btn" type="button" onClick={() => { setActiveModal(null); setEditingTagTarget(null); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="txm-body">
+              <div className="txm-field">
+                <label>Tên nhãn</label>
+                <input
+                  className="txm-input"
+                  type="text"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  placeholder="Ví dụ: Công việc"
+                />
+              </div>
+              <div className="txm-field">
+                <label>Màu nhãn</label>
+                <div className="txm-color-row">
+                  {["#ec4899", "#f97316", "#f59e0b", "#10b981", "#06b6d4", "#3b82f6", "#a855f7", "#e879f9", "#94a3b8", "#6b7280"].map(c => (
+                    <button
+                      key={c} type="button"
+                      className={`txm-color-dot ${newTagColor === c ? "active" : ""}`}
+                      style={{ background: c }}
+                      onClick={() => setNewTagColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="txm-field">
+                <label>Xem trước</label>
+                <div className="txm-tag-preview-area">
+                  <span className="txm-tag-preview-pill" style={{ background: newTagColor, color: "#fff" }}>
+                    {newTagName || editingTagTarget.name}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="txm-footer">
+              <button className="txm-btn-cancel" type="button" onClick={() => { setActiveModal(null); setEditingTagTarget(null); }}>Hủy</button>
+              <button
+                className="txm-btn-save"
+                type="button"
+                disabled={!newTagName.trim() || loading}
+                onClick={async () => {
+                  const trimmed = newTagName.trim();
+                  if (!trimmed || !editingTagTarget || !onUpdateTag) return;
+                  await onUpdateTag(editingTagTarget.id, { name: trimmed, color: newTagColor });
+                  setEditingTagTarget(null);
+                  setNewTagName("");
+                  setActiveModal(null);
+                }}
+              >Lưu thay đổi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- DELETE TAG MODAL --- */}
+      {activeModal === "deleteTag" && deletingTagTarget && (
+        <div className="txm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setActiveModal(null); setDeletingTagTarget(null); } }}>
+          <div className="txm-dialog txm-dialog-sm">
+            <div className="txm-dialog-header">
+              <h3>Xóa nhãn</h3>
+              <button className="txm-close-btn" type="button" onClick={() => { setActiveModal(null); setDeletingTagTarget(null); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="txm-body">
+              <div className="txm-confirm-card danger">
+                <div className="txm-confirm-icon danger"><IcTrash /></div>
+                <div className="txm-confirm-copy">
+                  <strong>{deletingTagTarget.name}</strong>
+                  <p>Nhãn sẽ bị gỡ khỏi giao dịch liên quan. Bạn vẫn giữ nguyên giao dịch và số tiền đã ghi.</p>
+                </div>
+              </div>
+            </div>
+            <div className="txm-footer">
+              <button className="txm-btn-cancel" type="button" onClick={() => { setActiveModal(null); setDeletingTagTarget(null); }}>Giữ lại</button>
+              <button
+                className="txm-btn-danger"
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  if (!deletingTagTarget || !onDeleteTag) return;
+                  await onDeleteTag(deletingTagTarget.id);
+                  setDeletingTagTarget(null);
+                  setActiveModal(null);
+                }}
+              >Xóa nhãn</button>
             </div>
           </div>
         </div>

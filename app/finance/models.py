@@ -79,6 +79,18 @@ class Account(Base):
     def balance(self, value: float) -> None:
         self.opening_balance = value
 
+class AccountUpdateHistory(Base):
+    __tablename__ = "account_update_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String, nullable=False)
+    item_name = Column(String, nullable=False)
+    change_amount = Column(Float, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    performer = Column(String, nullable=False, default="system")
+    account = relationship("Account")
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -191,6 +203,18 @@ class SavingsGoal(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class SavingsContribution(Base):
+    __tablename__ = "savings_contributions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    goal_id = Column(Integer, ForeignKey("savings_goals.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    date = Column(Date, nullable=False)
+    description = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    goal = relationship("SavingsGoal")
 
 class Reminder(Base):
     __tablename__ = "reminders"
@@ -230,3 +254,5 @@ class Bill(Base):
     @property
     def account_name(self):
         return self.account.name if self.account else None
+
+

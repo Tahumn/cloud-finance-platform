@@ -55,3 +55,16 @@ export const resetPasswordConfirm = (reset_token, password) =>
     method: "POST",
     body: { reset_token, password }
   });
+
+
+export const updateMe = (payload) =>
+  request("/auth/me", {
+    method: "PATCH",
+    body: payload
+  });
+
+export const changePassword = (current_password, new_password) =>
+  request("/auth/change-password", {
+    method: "POST",
+    body: { current_password, new_password }
+  });

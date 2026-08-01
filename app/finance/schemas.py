@@ -133,7 +133,10 @@ class BudgetCreate(BaseModel):
 
 
 class BudgetUpdate(BaseModel):
-    amount: float = Field(..., gt=0)
+    category_id: int | None = None
+    amount: float | None = Field(default=None, gt=0)
+    period_start: DateType | None = None
+    period_end: DateType | None = None
 
 
 class BudgetRead(BaseModel):

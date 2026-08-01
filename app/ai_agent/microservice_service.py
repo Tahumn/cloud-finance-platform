@@ -15,7 +15,7 @@ import pytesseract
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.ai_agent.models import ChatMessage
+from app.ai_agent.models import ChatMessage, PendingChatAction
 from app.core.auth_context import RequestUser
 from app.core.config import settings
 import json
@@ -86,6 +86,14 @@ DELETE_KEYWORDS = ("xoa", "huy", "bo")
 ANOMALY_KEYWORDS = ("bat thuong", "anomaly", "dot bien")
 FORECAST_KEYWORDS = ("du bao", "forecast", "thang toi", "thang sau")
 SAVING_KEYWORDS = ("tiet kiem", "goi y", "toi uu", "cat giam")
+SAVINGS_GOAL_CREATE_HINTS = ("lap muc tieu", "tao muc tieu", "dat muc tieu", "muc tieu tiet kiem", "tiet kiem de", "tiet kiem cho", "de danh de", "de danh cho")
+SAVINGS_GOAL_LIST_HINTS = ("muc tieu cua toi", "danh sach muc tieu", "tien do muc tieu", "muc tieu tiet kiem")
+GENERAL_QUESTION_HINTS = ("la gi", "tai sao", "vi sao", "lam sao", "nhu nao", "the nao", "huong dan", "giai thich", "ban biet", "nen lam gi")
+LIVE_DATA_TOPIC_HINTS = ("thoi tiet", "nhiet do", "mua khong", "tin tuc", "ty gia", "gia vang")
+REPORT_QUERY_HINTS = ("bao nhieu", "ton bao nhieu", "ton nhieu", "ton nhiu", "chi bao nhieu", "chi nhieu", "chi nhiu", "chi tieu", "tong quan", "so du", "lich su", "giao dich")
+ACTIVITY_REPORT_HINTS = ("lam gi", "chi gi", "mua gi", "giao dich nao", "danh sach", "lich su")
+CATEGORY_REPORT_HINTS = ("vao dau", "danh muc", "nhieu nhat", "top", "chi gi")
+COMPARE_REPORT_HINTS = ("so voi", "tang hay giam", "tang giam", "chenh lech")
 BUDGET_KEYWORDS = ("ngan sach", "han muc", "set budget", "dinh muc")
 DEBT_KEYWORDS = (" no ", " vay ", " muon ", " nợ ", " vay ", " mượn ")
 RECURRING_KEYWORDS = ("dinh ky", "hang thang", "thanh toan hang", "netflix", "spotify", "icloud")
@@ -892,6 +900,168 @@ def get_savings_suggestions(
     }
 
 
+def _report_range_from_text(text: str) -> tuple[DateType, DateType, str]:
+    normalized = _normalize_text(text)
+    today = DateType.today()
+    if 'hom qua' in normalized:
+        target = today - timedelta(days=1)
+        return target, target, 'hom qua'
+    if 'hom kia' in normalized:
+        target = today - timedelta(days=2)
+        return target, target, 'hom kia'
+    if 'tuan nay' in normalized:
+        return today - timedelta(days=today.weekday()), today, 'tuan nay'
+    if 'thang nay' in normalized:
+        return today.replace(day=1), today, 'thang nay'
+    if 'tuan truoc' in normalized:
+        current_start = today - timedelta(days=today.weekday())
+        end_date = current_start - timedelta(days=1)
+        return end_date - timedelta(days=6), end_date, 'tuan truoc'
+    if 'tuan nay' in normalized:
+        return today - timedelta(days=today.weekday()), today, 'tuan nay'
+    if 'thang truoc' in normalized:
+        end_date = today.replace(day=1) - timedelta(days=1)
+        return end_date.replace(day=1), end_date, 'thang truoc'
+    if 'nam nay' in normalized:
+        return today.replace(month=1, day=1), today, 'nam nay'
+    if 'hom nay' in normalized:
+        return today, today, 'hom nay'
+
+    match = DATE_DDMM_REGEX.search(normalized)
+    if match:
+        year = int(match.group('year') or today.year)
+        if year < 100:
+            year += 2000
+        try:
+            target = DateType(year, int(match.group('month')), int(match.group('day')))
+            return target, target, target.strftime('%d/%m/%Y')
+        except ValueError:
+            pass
+    return today.replace(day=1), today, 'thang nay'
+
+
+def _previous_report_range(start_date: DateType, end_date: DateType) -> tuple[DateType, DateType]:
+    length = (end_date - start_date).days + 1
+    previous_end = start_date - timedelta(days=1)
+    return previous_end - timedelta(days=length - 1), previous_end
+
+
+def _is_chat_report_request(text: str) -> bool:
+    normalized = _normalize_text(text)
+    has_time_reference = any(
+        marker in normalized
+        for marker in ('hom nay', 'hom qua', 'hom kia', 'tuan nay', 'tuan truoc', 'thang nay', 'thang truoc', 'nam nay')
+    ) or bool(DATE_DDMM_REGEX.search(normalized))
+    has_report_hint = any(marker in normalized for marker in REPORT_QUERY_HINTS + ACTIVITY_REPORT_HINTS + CATEGORY_REPORT_HINTS + COMPARE_REPORT_HINTS)
+    return has_report_hint and (has_time_reference or 'giao dich' in normalized or 'tong quan' in normalized)
+
+
+def _report_transaction_type(text: str, *, for_activity: bool) -> str | None:
+    normalized = _normalize_text(text)
+    if for_activity and not any(word in normalized for word in ('chi', 'thu', 'ton', 'tieu')):
+        return None
+    if any(word in normalized for word in ('thu nhap', 'luong', 'tien ve', 'kiem duoc')):
+        return 'income'
+    return 'expense'
+
+
+def _report_summary_values(summary: dict[str, Any]) -> tuple[float, float, float]:
+    income = float(summary.get('total_income') or summary.get('period_total_income') or 0)
+    expense = float(summary.get('total_expense') or summary.get('period_total_expense') or 0)
+    balance = float(summary.get('balance') or summary.get('period_net_flow') or income - expense)
+    return income, expense, balance
+
+
+def _format_report_transaction(item: dict[str, Any]) -> str:
+    tx_date = _coerce_date(item.get('date'))
+    date_label = tx_date.strftime('%d/%m') if tx_date else 'Khong ro ngay'
+    transaction_type = 'Thu' if item.get('transaction_type') == 'income' else 'Chi'
+    category = item.get('categoryLabel') or 'Chua phan loai'
+    amount = float(item.get('amount') or 0)
+    description = item.get('description') or 'Giao dich'
+    return f'- {date_label}: {transaction_type} {amount:,.0f} VND | {category} | {description}'
+
+
+def _answer_report_chat(text: str, authorization: str | None) -> dict[str, Any]:
+    normalized = _normalize_text(text)
+    start_date, end_date, label = _report_range_from_text(text)
+    summary = _request_json(
+        'GET',
+        '/reports/summary',
+        authorization,
+        params={'start_date': start_date.isoformat(), 'end_date': end_date.isoformat()},
+    )
+    income, expense, balance = _report_summary_values(summary if isinstance(summary, dict) else {})
+    is_activity = any(marker in normalized for marker in ACTIVITY_REPORT_HINTS)
+    is_category = any(marker in normalized for marker in CATEGORY_REPORT_HINTS)
+    is_comparison = any(marker in normalized for marker in COMPARE_REPORT_HINTS)
+
+    if is_comparison:
+        previous_start, previous_end = _previous_report_range(start_date, end_date)
+        previous = _request_json(
+            'GET',
+            '/reports/summary',
+            authorization,
+            params={'start_date': previous_start.isoformat(), 'end_date': previous_end.isoformat()},
+        )
+        _, previous_expense, _ = _report_summary_values(previous if isinstance(previous, dict) else {})
+        difference = expense - previous_expense
+        direction = 'tang' if difference > 0 else 'giam' if difference < 0 else 'khong doi'
+        return _response(
+            f'{label}: chi {expense:,.0f} VND. Ky truoc chi {previous_expense:,.0f} VND, {direction} {abs(difference):,.0f} VND.',
+            'report_comparison',
+            total=expense,
+        )
+
+    start_label = start_date.strftime('%d/%m')
+    end_label = end_date.strftime('%d/%m')
+    lines = [
+        f'Bao cao {label} ({start_label} - {end_label}):',
+        f'- Tong thu: {income:,.0f} VND',
+        f'- Tong chi: {expense:,.0f} VND',
+        f'- Chenh lech: {balance:,.0f} VND',
+    ]
+
+    if is_category:
+        transaction_type = _report_transaction_type(text, for_activity=False) or 'expense'
+        categories = _request_json(
+            'GET',
+            '/reports/category-breakdown',
+            authorization,
+            params={
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'transaction_type': transaction_type,
+            },
+        )
+        rows = categories if isinstance(categories, list) else []
+        if rows:
+            lines.append('Danh muc lon nhat:')
+            for row in rows[:5]:
+                category = row.get('category') or 'Khac'
+                spent = float(row.get('spent') or 0)
+                lines.append(f'- {category}: {spent:,.0f} VND')
+        else:
+            lines.append('Chua co giao dich theo danh muc trong ky nay.')
+
+    if is_activity:
+        items = _list_transactions(
+            authorization,
+            start_date=start_date,
+            end_date=end_date,
+            transaction_type=_report_transaction_type(text, for_activity=True),
+            limit=20,
+        )
+        if items:
+            lines.append('Giao dich gan nhat:')
+            lines.extend(_format_report_transaction(item) for item in items[:10])
+        else:
+            lines.append('Khong co giao dich phu hop trong ky nay.')
+
+    intent = 'report_activity' if is_activity else 'report_category' if is_category else 'report_summary'
+    return _response('\n'.join(lines), intent, total=expense)
+
+
 def _month_summary(text: str, authorization: str | None) -> dict[str, Any]:
     start_date, end_date = _summary_range(text)
     summary = _request_json(
@@ -923,6 +1093,546 @@ def _latest_transaction(authorization: str | None) -> dict[str, Any] | None:
     return items[0] if items else None
 
 
+CONFIRMATION_TEXTS = {'dong y', 'xac nhan', 'ok', 'oke', 'yes', 'ghi di', 'thuc hien'}
+CANCELLATION_TEXTS = {'khong', 'khong ghi', 'huy', 'bo qua', 'dung lai'}
+
+
+def _response(
+    answer: str,
+    intent: str,
+    *,
+    total: float | None = None,
+    category_name: str | None = None,
+    requires_confirmation: bool = False,
+    pending_action_id: int | None = None,
+) -> dict[str, Any]:
+    return {
+        'answer': answer,
+        'intent': intent,
+        'start_date': None,
+        'end_date': None,
+        'category_name': category_name,
+        'total': total,
+        'requires_confirmation': requires_confirmation,
+        'pending_action_id': pending_action_id,
+    }
+
+
+def _is_confirmation(text: str) -> bool:
+    return _normalize_text(text) in CONFIRMATION_TEXTS
+
+
+def _is_cancellation(text: str) -> bool:
+    return _normalize_text(text) in CANCELLATION_TEXTS
+
+
+def _get_pending_action(db: Session, current_user: RequestUser) -> PendingChatAction | None:
+    return (
+        db.query(PendingChatAction)
+        .filter(PendingChatAction.user_id == current_user.id)
+        .order_by(desc(PendingChatAction.updated_at), desc(PendingChatAction.id))
+        .first()
+    )
+
+
+def _save_pending_action(
+    db: Session,
+    current_user: RequestUser,
+    action_type: str,
+    payload: dict[str, Any],
+) -> PendingChatAction:
+    pending = _get_pending_action(db, current_user)
+    if pending is None:
+        pending = PendingChatAction(user_id=current_user.id, action_type=action_type, payload='{}')
+        db.add(pending)
+    pending.action_type = action_type
+    pending.payload = json.dumps(payload, ensure_ascii=False, default=str)
+    db.commit()
+    db.refresh(pending)
+    return pending
+
+
+def _clear_pending_action(db: Session, pending: PendingChatAction) -> None:
+    db.delete(pending)
+    db.commit()
+
+
+def _transaction_preview(transaction: dict[str, Any]) -> str:
+    transaction_type = transaction.get('transaction_type') or 'expense'
+    verb = 'Thu' if transaction_type == 'income' else 'Chi'
+    amount = float(transaction.get('amount') or 0)
+    category = transaction.get('category_name') or 'Chua phan loai'
+    tx_date = _coerce_date(transaction.get('date')) or DateType.today()
+    description = transaction.get('description') or 'Giao dich'
+    return f'- {verb} {amount:,.0f} VND | {category} | {tx_date.isoformat()} | {description}'
+
+
+def _store_transaction_proposal(
+    db: Session,
+    current_user: RequestUser,
+    transactions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    missing = [index for index, item in enumerate(transactions) if not item.get('amount')]
+    if not missing:
+        total = sum(float(item.get('amount') or 0) for item in transactions)
+        return _response(
+            'Giao dich da du thong tin va se duoc ghi ngay.',
+            'create_transaction_ready',
+            total=total,
+            requires_confirmation=False,
+        )
+
+    payload = {'transactions': transactions, 'missing_amount_indexes': missing}
+    pending = _save_pending_action(db, current_user, 'create_transaction', payload)
+    return _response(
+        'Minh can so tien cho giao dich dang cho. Ban hay nhap so tien, vi du: 50k hom qua.',
+        'ask_amount',
+        requires_confirmation=False,
+        pending_action_id=pending.id,
+    )
+
+def _transaction_needs_confirmation(transaction: dict[str, Any], text: str) -> bool:
+    amount = transaction.get('amount')
+    if not amount or float(amount) <= 0:
+        return True
+    if transaction.get('transaction_type') not in {'income', 'expense'}:
+        return True
+    if not str(transaction.get('description') or '').strip():
+        return True
+    if transaction.get('warnings'):
+        return True
+    confidence = transaction.get('confidence')
+    if confidence is not None and float(confidence) < 0.7:
+        return True
+    normalized = _normalize_text(text)
+    ambiguous_phrases = ('gia su', 'vi du', 'thu nghiem', 'test', 'chi hoi', 'khong ghi')
+    return any(phrase in normalized for phrase in ambiguous_phrases)
+
+
+def _execute_create_transactions(
+    transactions: list[dict[str, Any]],
+    authorization: str | None,
+) -> dict[str, Any]:
+    created = [
+        create_transaction_from_parsed(
+            item,
+            fallback_text=item.get('description') or 'Chat transaction',
+            authorization=authorization,
+        )
+        for item in transactions
+    ]
+    total = sum(float(item.get('amount') or 0) for item in created)
+    if len(created) == 1:
+        item = created[0]
+        verb = 'thu' if item.get('transaction_type') == 'income' else 'chi'
+        return _response(f'Da ghi nhan {verb} {total:,.0f} VND.', 'create_transaction', total=total)
+    return _response(
+        f'Da ghi nhan {len(created)} giao dich, tong cong {total:,.0f} VND.',
+        'create_transaction',
+        total=total,
+    )
+
+
+def _create_transaction_response(
+    db: Session,
+    current_user: RequestUser,
+    text: str,
+    transactions: list[dict[str, Any]],
+    authorization: str | None,
+) -> dict[str, Any]:
+    needs_more_info = any(not item.get('amount') or float(item.get('amount') or 0) <= 0 for item in transactions)
+    if needs_more_info:
+        return _store_transaction_proposal(db, current_user, transactions)
+    return _execute_create_transactions(transactions, authorization)
+
+
+def _transaction_matches_text(transaction: dict[str, Any], text: str) -> int:
+    normalized = _normalize_text(text)
+    haystack = _normalize_text(
+        ' '.join(
+            str(value or '')
+            for value in (
+                transaction.get('description'),
+                transaction.get('categoryLabel'),
+                transaction.get('accountName'),
+            )
+        )
+    )
+    ignored = set(UPDATE_KEYWORDS + DELETE_KEYWORDS + ('giao', 'dich', 'khoan', 'nay', 'do', 'voi', 'la', 'thanh'))
+    words = [word for word in re.findall(r'\w+', normalized) if len(word) >= 3 and word not in ignored]
+    score = sum(1 for word in words if word in haystack)
+    requested_amount = _extract_amount(text)
+    if requested_amount and float(transaction.get('amount') or 0) == requested_amount:
+        score += 3
+    return score
+
+
+def _select_transaction_for_change(text: str, authorization: str | None) -> dict[str, Any] | None:
+    candidates = _list_transactions(authorization, limit=100)
+    ranked = sorted(
+        ((item, _transaction_matches_text(item, text)) for item in candidates),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    if ranked and ranked[0][1] > 0:
+        return ranked[0][0]
+    normalized = _normalize_text(text)
+    if 'gan nhat' in normalized or 'vua ghi' in normalized:
+        return candidates[0] if candidates else None
+    return None
+
+
+def _store_delete_proposal(
+    db: Session,
+    current_user: RequestUser,
+    text: str,
+    authorization: str | None,
+) -> dict[str, Any]:
+    transaction = _select_transaction_for_change(text, authorization)
+    if transaction is None:
+        return _response(
+            'Minh chua xac dinh duoc giao dich can xoa. Hay noi them mo ta, so tien hoac ngay giao dich.',
+            'ask_transaction_reference',
+        )
+    pending = _save_pending_action(
+        db,
+        current_user,
+        'delete_transaction',
+        {'transaction_id': transaction['id']},
+    )
+    return _response(
+        f'Minh se xoa giao dich sau:\n{_transaction_preview(transaction)}\nTra loi Xac nhan de xoa hoac Huy de bo qua.',
+        'confirm_delete_transaction',
+        requires_confirmation=True,
+        pending_action_id=pending.id,
+    )
+
+
+def _store_update_proposal(
+    db: Session,
+    current_user: RequestUser,
+    text: str,
+    authorization: str | None,
+) -> dict[str, Any]:
+    transaction = _select_transaction_for_change(text, authorization)
+    if transaction is None:
+        return _response(
+            'Minh chua xac dinh duoc giao dich can sua. Hay noi them mo ta, so tien hoac ngay giao dich.',
+            'ask_transaction_reference',
+        )
+    parsed = parse_transaction_text(
+        db,
+        current_user,
+        text,
+        auto_create_category=False,
+        authorization=authorization,
+    )
+    update: dict[str, Any] = {}
+    if parsed.get('amount'):
+        update['amount'] = float(parsed['amount'])
+    if parsed.get('category_id'):
+        update['category_id'] = parsed['category_id']
+    if not update:
+        return _response('Minh chua nhan ra thong tin can sua. Hay cho minh so tien hoac danh muc moi.', 'ask_more_info')
+    pending = _save_pending_action(
+        db,
+        current_user,
+        'update_transaction',
+        {'transaction_id': transaction['id'], 'update': update},
+    )
+    amount = float(update.get('amount') or transaction.get('amount') or 0)
+    return _response(
+        f'Minh se sua giao dich sau thanh {amount:,.0f} VND:\n{_transaction_preview(transaction)}\nTra loi Xac nhan de cap nhat hoac Huy de bo qua.',
+        'confirm_update_transaction',
+        total=amount,
+        requires_confirmation=True,
+        pending_action_id=pending.id,
+    )
+
+
+def _store_resource_proposal(
+    db: Session,
+    current_user: RequestUser,
+    action_type: str,
+    parsed: dict[str, Any],
+) -> dict[str, Any]:
+    if not parsed.get('amount'):
+        return _response('Minh can so tien truoc khi thuc hien yeu cau nay.', 'ask_amount')
+    pending = _save_pending_action(db, current_user, action_type, parsed)
+    labels = {
+        'create_budget': 'tao ngan sach',
+        'create_debt': 'ghi khoan no',
+        'create_subscription': 'tao thanh toan dinh ky',
+    }
+    amount = float(parsed['amount'])
+    return _response(
+        f'Minh se {labels[action_type]} {amount:,.0f} VND. Tra loi Xac nhan de thuc hien hoac Huy de bo qua.',
+        f'confirm_{action_type}',
+        total=amount,
+        requires_confirmation=True,
+        pending_action_id=pending.id,
+    )
+
+
+def _execute_pending_action(
+    db: Session,
+    pending: PendingChatAction,
+    authorization: str | None,
+) -> dict[str, Any]:
+    payload = json.loads(pending.payload)
+    if pending.action_type == 'create_transaction':
+        created = [
+            create_transaction_from_parsed(item, fallback_text=item.get('description') or 'Chat transaction', authorization=authorization)
+            for item in payload.get('transactions', [])
+        ]
+        total = sum(float(item.get('amount') or 0) for item in created)
+        if len(created) == 1:
+            item = created[0]
+            verb = 'thu' if item.get('transaction_type') == 'income' else 'chi'
+            return _response(f'Da ghi nhan {verb} {total:,.0f} VND.', 'create_transaction', total=total)
+        return _response(f'Da ghi nhan {len(created)} giao dich, tong cong {total:,.0f} VND.', 'create_transaction', total=total)
+
+    if pending.action_type == 'update_transaction':
+        updated = _request_json(
+            'PUT',
+            f"/transactions/{payload['transaction_id']}",
+            authorization,
+            payload=payload['update'],
+        )
+        return _response(
+            f"Da cap nhat giao dich thanh {float(updated.get('amount') or 0):,.0f} VND.",
+            'update_transaction',
+            total=float(updated.get('amount') or 0),
+        )
+
+    if pending.action_type == 'delete_transaction':
+        _request_json('DELETE', f"/transactions/{payload['transaction_id']}", authorization)
+        return _response('Da xoa giao dich da chon.', 'delete_transaction')
+
+    if pending.action_type == 'create_budget':
+        category_id, category_name = _resolve_category(
+            payload.get('description') or '',
+            payload.get('category_name'),
+            False,
+            authorization,
+        )
+        budget_name = payload.get('description') or 'Ngan sach'
+        if category_name:
+            budget_name = f'Ngan sach {category_name}'
+        request_payload = {
+            'name': budget_name,
+            'category_id': category_id,
+            'amount': float(payload['amount']),
+            'cycle': payload.get('period') or 'monthly',
+        }
+        _request_json('POST', '/budgets', authorization, payload=request_payload, service='finance')
+        amount = request_payload['amount']
+        return _response(f'Da thiet lap ngan sach {amount:,.0f} VND.', 'create_budget')
+
+    if pending.action_type == 'create_debt':
+        request_payload = {
+            'name': payload.get('description') or 'Khoan no',
+            'amount': float(payload['amount']),
+            'due_date': str(payload.get('date') or DateType.today()),
+            'frequency': 'one_time',
+        }
+        _request_json('POST', '/debts', authorization, payload=request_payload, service='recurring')
+        amount = request_payload['amount']
+        return _response(f'Da ghi khoan no {amount:,.0f} VND.', 'create_debt')
+
+    if pending.action_type == 'create_subscription':
+        request_payload = {
+            'name': payload.get('description') or 'Thanh toan dinh ky',
+            'amount': float(payload['amount']),
+            'frequency': payload.get('frequency') or 'monthly',
+            'start_date': str(payload.get('date') or DateType.today()),
+        }
+        _request_json('POST', '/subscriptions', authorization, payload=request_payload, service='recurring')
+        amount = request_payload['amount']
+        return _response(f'Da tao thanh toan dinh ky {amount:,.0f} VND.', 'create_subscription')
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unsupported pending action')
+
+
+def _handle_pending_action(
+    db: Session,
+    current_user: RequestUser,
+    text: str,
+    authorization: str | None,
+) -> dict[str, Any] | None:
+    pending = _get_pending_action(db, current_user)
+    if pending is None:
+        return None
+    if _is_cancellation(text):
+        _clear_pending_action(db, pending)
+        return _response('Da huy thao tac dang cho.', 'cancelled')
+    if _is_confirmation(text):
+        response = _execute_pending_action(db, pending, authorization)
+        _clear_pending_action(db, pending)
+        return response
+    if pending.action_type != 'create_transaction':
+        return _response(
+            'Thao tac dang cho can xac nhan. Tra loi Xac nhan de thuc hien hoac Huy de bo qua.',
+            'awaiting_confirmation',
+            requires_confirmation=True,
+            pending_action_id=pending.id,
+        )
+
+    payload = json.loads(pending.payload)
+    transactions = payload.get('transactions') or []
+    missing = payload.get('missing_amount_indexes') or []
+
+    if not transactions:
+        _clear_pending_action(db, pending)
+        return None
+
+    if not missing:
+        _clear_pending_action(db, pending)
+        return None
+
+    if _is_greeting(text) or _is_general_question(text):
+        _clear_pending_action(db, pending)
+        return None
+
+    supplement = parse_transaction_text(
+        db,
+        current_user,
+        text,
+        auto_create_category=False,
+        authorization=authorization,
+    )
+    target = transactions[missing[0]]
+    if supplement.get('amount'):
+        target['amount'] = supplement['amount']
+    if supplement.get('date'):
+        target['date'] = supplement['date']
+    if supplement.get('category_name'):
+        target['category_name'] = supplement['category_name']
+        target['category_id'] = supplement.get('category_id')
+
+    remaining_missing = [index for index, item in enumerate(transactions) if not item.get('amount')]
+    if remaining_missing:
+        return _store_transaction_proposal(db, current_user, transactions)
+
+    response = _execute_create_transactions(transactions, authorization)
+    _clear_pending_action(db, pending)
+    return response
+
+
+def _is_general_question(text: str) -> bool:
+    normalized = _normalize_text(text)
+    return '?' in text or any(hint in normalized for hint in GENERAL_QUESTION_HINTS)
+
+
+def _looks_like_transaction_request(text: str, parsed: dict[str, Any] | None = None) -> bool:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return False
+    if _is_greeting(text) or _is_general_question(text):
+        return False
+    if parsed and parsed.get('amount') and float(parsed.get('amount') or 0) > 0:
+        return True
+    if any(keyword in normalized for keyword in INCOME_KEYWORDS + EXPENSE_KEYWORDS):
+        return True
+    if any(marker in normalized for marker in ('ghi', 'them', 'tao', 'nhap', 'vua', 'moi', 'roi')):
+        return True
+    category_hint = _pick_category_name(text)
+    time_hint = any(marker in normalized for marker in ('hom nay', 'hom qua', 'vua', 'moi', 'roi'))
+    return bool(category_hint and time_hint)
+
+
+def _answer_general_question(text: str) -> dict[str, Any]:
+    normalized = _normalize_text(text)
+    if any(topic in normalized for topic in LIVE_DATA_TOPIC_HINTS):
+        return _response(
+            'Minh chua duoc ket noi du lieu thoi gian thuc, nen khong the xac nhan thong tin nay. Ban co the kiem tra tren ung dung thoi tiet hoac de minh ket noi nguon du lieu phu hop.',
+            'live_data_unavailable',
+        )
+    system_instruction = (
+        'Ban la tro ly tai chinh than thien. Tra loi ngan gon, dung tieng Viet, '
+        'khong tu nhan da thuc hien giao dich. Neu can du lieu tai khoan, hay noi '
+        'nguoi dung dat cau hoi cu the ve giao dich cua ho. Tra ve JSON voi khoa answer.'
+    )
+    result = get_gemini_response(text, system_instruction)
+    answer = result.get('answer') if isinstance(result, dict) else None
+    if not answer:
+        answer = 'Minh co the giup giai thich, ghi giao dich va tra cuu du lieu tai chinh cua ban. Ban muon hoi gi cu the?'
+    return _response(str(answer), 'general_question')
+
+
+def _is_savings_goal_create_request(text: str) -> bool:
+    normalized = _normalize_text(text)
+    return any(hint in normalized for hint in SAVINGS_GOAL_CREATE_HINTS)
+
+
+def _is_savings_goal_list_request(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if _is_savings_goal_create_request(text):
+        return False
+    return any(hint in normalized for hint in SAVINGS_GOAL_LIST_HINTS)
+
+
+def _goal_name_from_text(text: str) -> str:
+    match = re.search(r'(?:de|để|cho)\s+(.+?)(?:\s+(?:trong|den|đến|truoc|trước|moi|mỗi|hang|hàng)\s+|$)', text, re.IGNORECASE)
+    if match:
+        purpose = match.group(1).strip(' .,!')
+        if purpose:
+            return f'Tiet kiem {purpose}'
+    normalized = _normalize_text(text)
+    if any(word in normalized for word in ('du lich', 'phu quoc', 'da lat', 'bien')):
+        return 'Tiet kiem du lich'
+    if any(word in normalized for word in ('mua xe', 'o to', 'xe may')):
+        return 'Tiet kiem mua xe'
+    if any(word in normalized for word in ('nha', 'can ho')):
+        return 'Tiet kiem mua nha'
+    return 'Muc tieu tiet kiem'
+
+
+def _goal_type_from_text(text: str) -> str:
+    normalized = _normalize_text(text)
+    if any(word in normalized for word in ('du lich', 'phu quoc', 'da lat', 'bien')):
+        return 'travel'
+    if any(word in normalized for word in ('mua xe', 'o to', 'xe may')):
+        return 'vehicle'
+    if any(word in normalized for word in ('nha', 'can ho')):
+        return 'home'
+    return 'savings'
+
+
+def _create_savings_goal_from_text(text: str, authorization: str | None) -> dict[str, Any]:
+    target_amount = _extract_amount(text)
+    if target_amount is None:
+        return _response(
+            'Minh can so tien muc tieu. Vi du: Lap muc tieu tiet kiem 20 trieu de du lich.',
+            'ask_goal_amount',
+        )
+    payload = {
+        'name': _goal_name_from_text(text),
+        'target_amount': float(target_amount),
+        'goal_type': _goal_type_from_text(text),
+        'status': 'active',
+    }
+    created = _request_json('POST', '/savings-goals', authorization, payload=payload)
+    name = created.get('name') or payload['name']
+    amount = float(created.get('target_amount') or payload['target_amount'])
+    return _response(f'Da tao muc tieu {name}: {amount:,.0f} VND.', 'create_savings_goal', total=amount)
+
+
+def _list_savings_goals_chat(authorization: str | None) -> dict[str, Any]:
+    goals = _request_json('GET', '/savings-goals', authorization)
+    rows = goals if isinstance(goals, list) else []
+    if not rows:
+        return _response('Ban chua co muc tieu tiet kiem nao.', 'list_savings_goals')
+    lines = ['Muc tieu tiet kiem cua ban:']
+    for goal in rows[:10]:
+        target = float(goal.get('target_amount') or 0)
+        saved = float(goal.get('saved_amount') or 0)
+        progress = float(goal.get('progress') or 0)
+        name = goal.get('name') or 'Muc tieu'
+        lines.append(f'- {name}: {saved:,.0f}/{target:,.0f} VND ({progress:.0f}%)')
+    return _response('\n'.join(lines), 'list_savings_goals')
+
+
 def answer_chat(
     db: Session,
     current_user: RequestUser,
@@ -930,6 +1640,11 @@ def answer_chat(
     authorization: str | None,
 ) -> dict[str, Any]:
     normalized = _normalize_text(text)
+
+    pending_response = _handle_pending_action(db, current_user, text, authorization)
+    if pending_response is not None:
+        _persist_chat_messages(db, current_user, text, pending_response)
+        return pending_response
 
     if _is_greeting(text):
         return {
@@ -980,6 +1695,16 @@ def answer_chat(
         _persist_chat_messages(db, current_user, text, response)
         return response
 
+    if _is_savings_goal_create_request(text):
+        response = _create_savings_goal_from_text(text, authorization)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
+
+    if _is_savings_goal_list_request(text):
+        response = _list_savings_goals_chat(authorization)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
+
     if any(keyword in normalized for keyword in SAVING_KEYWORDS):
         suggestions = get_savings_suggestions(db, current_user, authorization)
         response = {
@@ -993,8 +1718,22 @@ def answer_chat(
         _persist_chat_messages(db, current_user, text, response)
         return response
 
-    if any(keyword in normalized for keyword in SUMMARY_KEYWORDS):
+    if _is_chat_report_request(text):
+        response = _answer_report_chat(text, authorization)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
+
+    if (
+        any(keyword in normalized for keyword in SUMMARY_KEYWORDS)
+        and not _is_general_question(text)
+        and not any(topic in normalized for topic in LIVE_DATA_TOPIC_HINTS)
+    ):
         response = _month_summary(text, authorization)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
+
+    if _is_general_question(text):
+        response = _answer_general_question(text)
         _persist_chat_messages(db, current_user, text, response)
         return response
 
@@ -1002,14 +1741,14 @@ def answer_chat(
     # Handle cases like: "Duoc me cho 500k, an het 100k, do xang 50k"
     # even when Gemini fails to return `is_multiple=true`.
     segments = _split_transaction_segments(text)
-    if len(segments) >= 2:
+    if False and len(segments) >= 2:
         parsed_items: list[dict[str, Any]] = []
         for segment in segments:
             parsed_seg = parse_transaction_text(
                 db,
                 current_user,
                 segment,
-                auto_create_category=True,
+                auto_create_category=False,
                 authorization=authorization,
             )
             if parsed_seg.get("amount") is None:
@@ -1057,6 +1796,9 @@ def answer_chat(
             return response
 
     if any(keyword in normalized for keyword in DELETE_KEYWORDS):
+        response = _store_delete_proposal(db, current_user, text, authorization)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
         latest = _latest_transaction(authorization)
         if not latest:
             response = {
@@ -1082,6 +1824,9 @@ def answer_chat(
         return response
 
     if any(keyword in normalized for keyword in UPDATE_KEYWORDS):
+        response = _store_update_proposal(db, current_user, text, authorization)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
         latest = _latest_transaction(authorization)
         if not latest:
             response = {
@@ -1098,7 +1843,7 @@ def answer_chat(
             db,
             current_user,
             text,
-            auto_create_category=True,
+            auto_create_category=False,
             authorization=authorization,
         )
         update_payload: dict[str, Any] = {}
@@ -1137,11 +1882,20 @@ def answer_chat(
         db,
         current_user,
         text,
-        auto_create_category=True,
+        auto_create_category=False,
         authorization=authorization,
     )
     
     if parsed.get("is_multiple") and parsed.get("transactions"):
+        response = _create_transaction_response(
+            db,
+            current_user,
+            text,
+            parsed['transactions'],
+            authorization,
+        )
+        _persist_chat_messages(db, current_user, text, response)
+        return response
         created_txs = []
         for tx in parsed["transactions"]:
             created = create_transaction_from_parsed(tx, fallback_text=text, authorization=authorization)
@@ -1185,11 +1939,20 @@ def answer_chat(
     elif any(kw in normalized for kw in RECURRING_KEYWORDS):
         parsed["intent"] = "create_subscription"
 
-    # -- BẮT ĐẦU CRITIC AGENT --
-    # Kiểm tra xem người dùng có phải đang đính chính "À nhầm" không
-    critic_prompt = f"Câu nói: '{text}'. Dữ liệu vừa trích xuất: {parsed}. Nếu câu này mang ý nghĩa đính chính hoặc sửa lỗi cho giao dịch vừa mới thực hiện (ví dụ: 'à nhầm', 'ghi sai rồi', 'sửa lại thành...'), hãy trả về {{'intent': 'UPDATE_TRANSACTION'}}. Nếu là ghi chép mới hoàn toàn, trả về {{'intent': 'CREATE_TRANSACTION'}}. TRẢ VỀ JSON."
-    critic_data = get_gemini_response(critic_prompt, "Bạn là chuyên gia kiểm tra ý định đính chính của người dùng.")
-    
+    if parsed.get('intent') in {'create_budget', 'create_debt', 'create_subscription'}:
+        response = _store_resource_proposal(db, current_user, parsed['intent'], parsed)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
+
+    if not _looks_like_transaction_request(text, parsed):
+        response = _answer_general_question(text)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
+
+    response = _create_transaction_response(db, current_user, text, [parsed], authorization)
+    _persist_chat_messages(db, current_user, text, response)
+    return response
+
     if critic_data.get("intent") == "UPDATE_TRANSACTION":
         latest = _latest_transaction(authorization)
         if latest:
@@ -1211,6 +1974,9 @@ def answer_chat(
             return response
 
     if parsed.get("intent") == "create_budget":
+        response = _store_resource_proposal(db, current_user, 'create_budget', parsed)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
         # Resolve category if provided
         cat_id, resolved_cat_name = _resolve_category(text, parsed.get("category_name"), True, authorization)
             
@@ -1226,6 +1992,9 @@ def answer_chat(
         return response
 
     if parsed.get("intent") == "create_debt":
+        response = _store_resource_proposal(db, current_user, 'create_debt', parsed)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
         payload = {
             "name": parsed.get("description") or text,
             "amount": float(parsed["amount"]),
@@ -1238,6 +2007,9 @@ def answer_chat(
         return response
 
     if parsed.get("intent") == "create_subscription":
+        response = _store_resource_proposal(db, current_user, 'create_subscription', parsed)
+        _persist_chat_messages(db, current_user, text, response)
+        return response
         payload = {
             "name": parsed.get("description") or "Subscription",
             "amount": float(parsed["amount"]),
@@ -1261,6 +2033,9 @@ def answer_chat(
         _persist_chat_messages(db, current_user, text, response)
         return response
 
+    response = _store_transaction_proposal(db, current_user, [parsed])
+    _persist_chat_messages(db, current_user, text, response)
+    return response
     created = create_transaction_from_parsed(parsed, fallback_text=text, authorization=authorization)
     created_date = _coerce_date(created.get("date")) or _coerce_date(parsed.get("date"))
     amount = float(created.get("amount") or parsed.get("amount") or 0.0)

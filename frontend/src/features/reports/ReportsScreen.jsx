@@ -28,6 +28,79 @@ const fmt = (n) => {
   return String(n);
 };
 
+
+const buildDailySeries = (items, limit = 30) => {
+  const buckets = new Map();
+  [...items]
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+    .forEach((item) => {
+      const key = String(item.date || "").slice(0, 10);
+      if (!key) return;
+      if (!buckets.has(key)) buckets.set(key, { income: 0, expense: 0 });
+      const bucket = buckets.get(key);
+      if (item.transaction_type === "income") bucket.income += Number(item.amount || 0);
+      if (item.transaction_type === "expense") bucket.expense += Number(item.amount || 0);
+    });
+  return Array.from(buckets.entries()).slice(-limit).map(([date, values]) => ({
+    label: date.slice(5),
+    income: values.income,
+    expense: values.expense,
+  }));
+};
+
+const buildMonthlySeries = (items, limit = 6) => {
+  const buckets = new Map();
+  [...items]
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+    .forEach((item) => {
+      const key = String(item.date || "").slice(0, 7);
+      if (!key) return;
+      if (!buckets.has(key)) buckets.set(key, { income: 0, expense: 0 });
+      const bucket = buckets.get(key);
+      if (item.transaction_type === "income") bucket.income += Number(item.amount || 0);
+      if (item.transaction_type === "expense") bucket.expense += Number(item.amount || 0);
+    });
+  return Array.from(buckets.entries()).slice(-limit).map(([month, values]) => ({
+    month,
+    label: month.slice(5).replace("-", "/"),
+    income: values.income,
+    expense: values.expense,
+  }));
+};
+
+const buildCategorySpending = (items) => {
+  const expenseItems = items.filter((item) => item.transaction_type === "expense");
+  const total = expenseItems.reduce((sum, item) => sum + Number(item.amount || 0), 0) || 1;
+  const map = new Map();
+  expenseItems.forEach((item) => {
+    const key = item.category || item.categoryLabel || "Khác";
+    map.set(key, (map.get(key) || 0) + Number(item.amount || 0));
+  });
+  return Array.from(map.entries())
+    .map(([category, amount]) => ({ category, amount, share: amount / total }))
+    .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+};
+
+const buildWeekdayHeatmap = (items) => {
+  const expenseItems = items.filter((item) => item.transaction_type === "expense");
+  const dates = [...new Set(expenseItems.map((item) => String(item.date || "").slice(0, 10)).filter(Boolean))].sort();
+  const firstDate = dates[0] ? new Date(dates[0]) : null;
+  const map = new Map();
+  expenseItems.forEach((item) => {
+    const dateValue = String(item.date || "").slice(0, 10);
+    if (!dateValue) return;
+    const date = new Date(dateValue);
+    const weekDay = date.getDay();
+    const weekIndex = firstDate ? Math.max(0, Math.floor((date - firstDate) / 86400000 / 7)) : 0;
+    const key = `${weekIndex}:${weekDay}`;
+    map.set(key, (map.get(key) || 0) + Number(item.amount || 0));
+  });
+  return Array.from(map.entries()).map(([key, total]) => {
+    const [week_index, week_day] = key.split(":").map(Number);
+    return { week_index, week_day, total };
+  });
+};
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -102,48 +175,129 @@ export default function ReportsScreen({
   savingsGoals = [],
   filters,
   onFiltersChange,
+  accounts = [],
+  categories = [],
 }) {
   const [activeTab, setActiveTab] = useState("30 ngày");
   const [paymentPage, setPaymentPage] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedHeatmap, setSelectedHeatmap] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
   const PAYMENT_PER_PAGE = 3;
-
 
   const safeMonthly = Array.isArray(monthlySeries) ? monthlySeries : [];
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
   const overview = reportsOverview || {};
+  const accountMap = useMemo(() => Object.fromEntries(accounts.map((item) => [item.id, item])), [accounts]);
 
-  const dailySeries = Array.isArray(overview.daily_series) ? overview.daily_series : [];
-  const monthlyOverviewSeries = Array.isArray(overview.monthly_series) ? overview.monthly_series : [];
-  const categorySpending = Array.isArray(overview.category_spending) ? overview.category_spending : [];
-  const paymentBreakdown = Array.isArray(overview.payment_breakdown) ? overview.payment_breakdown : [];
-  const weekdayHeatmap = Array.isArray(overview.weekday_heatmap) ? overview.weekday_heatmap : [];
-  const topExpenses = Array.isArray(overview.top_expenses) ? overview.top_expenses : [];
-  const goalProgress = Array.isArray(overview.goals) ? overview.goals : [];
-
-  const currentMonthly = safeMonthly[safeMonthly.length - 1] || {};
-  const prevMonthly = safeMonthly[safeMonthly.length - 2] || safeMonthly[safeMonthly.length - 1] || {};
-
-  const currentNet = Number(currentMonthly.income || summary?.balance || 0) - Number(currentMonthly.expense || 0);
-  const prevNet = Number(prevMonthly.income || summary?.balance || 0) - Number(prevMonthly.expense || 0);
-
-  const currentSavingsRate = savingsGoals.length > 0 
-    ? savingsGoals.reduce((s, g) => s + (g.current_amount || 0), 0) / savingsGoals.reduce((s, g) => s + (g.target_amount || 1), 0)
-    : 0;
-
-  const prevSavingsRate = Number(prevMonthly.income || summary?.total_income || 0) > 0
-    ? Math.max(0, prevNet) / Number(prevMonthly.income || summary?.total_income || 1)
-    : 0;
-
-  const getKPI = () => {
-    const dInc = calcDelta(currentMonthly.income || summary?.total_income || 0, prevMonthly.income || 0);
-    const dExp = calcDelta(currentMonthly.expense || summary?.total_expense || 0, prevMonthly.expense || 0);
-    const dNet = calcDelta(currentNet, prevNet);
-    const dSav = currentSavingsRate - prevSavingsRate;
-    return { dInc, dExp, dNet, dSav };
+  const getSourceLabel = (tx) => {
+    const accountName = tx.account_id ? accountMap[tx.account_id]?.name : "";
+    if (accountName) return accountName;
+    const paymentTag = Array.isArray(tx.tags)
+      ? tx.tags.find((tag) => ["Tiền mặt", "Ngân hàng", "Ví điện tử"].includes(tag.name))
+      : null;
+    return paymentTag?.name || "Tiền mặt";
   };
-  const { dInc, dExp, dNet, dSav } = getKPI();
+
+  const hasClientFilters = Boolean(typeFilter || categoryFilter || sourceFilter);
+  const filteredTransactions = useMemo(() => {
+    return safeTransactions.filter((item) => {
+      if (typeFilter && item.transaction_type !== typeFilter) return false;
+      if (categoryFilter && String(item.category_id) !== String(categoryFilter)) return false;
+      if (sourceFilter && getSourceLabel(item) !== sourceFilter) return false;
+      return true;
+    });
+  }, [safeTransactions, typeFilter, categoryFilter, sourceFilter]);
+
+  const derivedSummary = useMemo(() => {
+    if (!hasClientFilters) return summary || {};
+    const total_income = filteredTransactions
+      .filter((item) => item.transaction_type === "income")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const total_expense = filteredTransactions
+      .filter((item) => item.transaction_type === "expense")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    return {
+      ...(summary || {}),
+      total_income,
+      total_expense,
+      balance: total_income - total_expense,
+    };
+  }, [filteredTransactions, hasClientFilters, summary]);
+
+  const derivedDailySeries = useMemo(() => buildDailySeries(filteredTransactions), [filteredTransactions]);
+  const derivedMonthlySeries = useMemo(() => buildMonthlySeries(filteredTransactions), [filteredTransactions]);
+  const derivedCategorySpending = useMemo(() => buildCategorySpending(filteredTransactions), [filteredTransactions]);
+  const derivedPaymentBreakdown = useMemo(() => {
+    const total = filteredTransactions.reduce((sum, item) => sum + Math.abs(Number(item.amount || 0)), 0) || 1;
+    const map = new Map();
+    filteredTransactions.forEach((item) => {
+      const key = getSourceLabel(item);
+      map.set(key, (map.get(key) || 0) + Math.abs(Number(item.amount || 0)));
+    });
+    return Array.from(map.entries())
+      .map(([source, amount]) => ({ source, amount, share: amount / total }))
+      .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+  }, [filteredTransactions]);
+  const derivedWeekdayHeatmap = useMemo(() => buildWeekdayHeatmap(filteredTransactions), [filteredTransactions]);
+  const derivedTopExpenses = useMemo(
+    () => [...filteredTransactions].filter((item) => item.transaction_type === "expense").sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0)).slice(0, 5),
+    [filteredTransactions]
+  );
+
+  const dailySeries = hasClientFilters
+    ? derivedDailySeries
+    : Array.isArray(overview.daily_series) && overview.daily_series.length
+      ? overview.daily_series
+      : buildDailySeries(safeTransactions);
+  const monthlyOverviewSeries = hasClientFilters
+    ? derivedMonthlySeries
+    : Array.isArray(overview.monthly_series) && overview.monthly_series.length
+      ? overview.monthly_series
+      : buildMonthlySeries(safeTransactions);
+  const categorySpending = hasClientFilters
+    ? derivedCategorySpending
+    : Array.isArray(overview.category_spending) && overview.category_spending.length
+      ? overview.category_spending
+      : buildCategorySpending(safeTransactions);
+  const paymentBreakdown = hasClientFilters
+    ? derivedPaymentBreakdown
+    : Array.isArray(overview.payment_breakdown) && overview.payment_breakdown.length
+      ? overview.payment_breakdown
+      : derivedPaymentBreakdown;
+  const weekdayHeatmap = hasClientFilters
+    ? derivedWeekdayHeatmap
+    : Array.isArray(overview.weekday_heatmap) && overview.weekday_heatmap.length
+      ? overview.weekday_heatmap
+      : buildWeekdayHeatmap(safeTransactions);
+  const topExpenses = hasClientFilters
+    ? derivedTopExpenses
+    : Array.isArray(overview.top_expenses) && overview.top_expenses.length
+      ? overview.top_expenses
+      : derivedTopExpenses;
+  const goalProgress = Array.isArray(overview.goals) && overview.goals.length
+    ? overview.goals
+    : savingsGoals.map((goal) => ({
+        name: goal.name,
+        target_amount: Number(goal.target_amount || 0),
+        saved_amount: Number(goal.current_amount || 0),
+        progress: goal.target_amount ? Number(goal.current_amount || 0) / Number(goal.target_amount || 1) : 0,
+      }));
+
+  const effectiveMonthly = hasClientFilters ? derivedMonthlySeries : safeMonthly;
+  const currentMonthly = effectiveMonthly[effectiveMonthly.length - 1] || {};
+  const prevMonthly = effectiveMonthly[effectiveMonthly.length - 2] || currentMonthly || {};
+  const currentNet = Number(derivedSummary?.total_income || 0) - Number(derivedSummary?.total_expense || 0);
+  const prevNet = Number(prevMonthly.income || 0) - Number(prevMonthly.expense || 0);
+  const currentSavingsRate = Number(derivedSummary?.total_income || 0) > 0 ? Math.max(0, currentNet) / Number(derivedSummary?.total_income || 1) : 0;
+  const prevSavingsRate = Number(prevMonthly.income || 0) > 0 ? Math.max(0, prevNet) / Number(prevMonthly.income || 1) : 0;
+
+  const dInc = calcDelta(derivedSummary?.total_income || 0, prevMonthly.income || 0);
+  const dExp = calcDelta(derivedSummary?.total_expense || 0, prevMonthly.expense || 0);
+  const dNet = calcDelta(currentNet, prevNet);
+  const dSav = currentSavingsRate - prevSavingsRate;
 
   const donutTotal = categorySpending.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const donutItems = useMemo(() => {
@@ -182,28 +336,23 @@ export default function ReportsScreen({
     expense: Number(item.expense || 0),
   }));
 
-  const fallbackMonthly = (Array.isArray(monthlySeries) ? monthlySeries : []).map((m) => ({
-    label: String(m.month || "").slice(-5).replace("-", "/") || "N/A",
+  const fallbackMonthly = buildMonthlySeries(filteredTransactions.length ? filteredTransactions : safeTransactions).map((m) => ({
+    label: String(m.label || m.month || "").slice(-5).replace("-", "/") || "N/A",
     income: Number(m.income || 0),
     expense: Number(m.expense || 0),
   }));
   const monthlyBarsRaw = monthlyOverviewSeries.slice(-6).map((m) => ({
-    label: String(m.label || "").slice(-5).replace("-", "/") || "N/A",
+    label: String(m.label || m.month || "").slice(-5).replace("-", "/") || "N/A",
     income: Number(m.income || 0),
     expense: Number(m.expense || 0),
   }));
-  const monthlyBars = monthlyBarsRaw.length >= 3 ? monthlyBarsRaw : fallbackMonthly.slice(-6);
+  const monthlyBars = monthlyBarsRaw.length >= 1 ? monthlyBarsRaw : fallbackMonthly.slice(-6);
 
   const heatmapMax = Math.max(1, ...weekdayHeatmap.map((cell) => Number(cell.total || 0)));
   const heatmapValue = (weekIndex, weekDay) =>
     Number(weekdayHeatmap.find((cell) => cell.week_index === weekIndex && cell.week_day === weekDay)?.total || 0);
 
-  const topTransactions = topExpenses.length
-    ? topExpenses
-    : [...safeTransactions]
-        .filter((t) => t.transaction_type === "expense")
-        .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
-        .slice(0, 5);
+  const topTransactions = topExpenses.length ? topExpenses : derivedTopExpenses;
 
   const topCategory = donutItems[0];
   const aiTipText = topCategory
@@ -269,12 +418,46 @@ export default function ReportsScreen({
         </div>
       </div>
 
+      <div className="rpt-filters-bar">
+        <div className="rpt-filter-item">
+          <span>Nguồn tiền</span>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+            <option value="">Tất cả</option>
+            {[...new Set(accounts.map((item) => item.name).concat(["Tiền mặt", "Ngân hàng", "Ví điện tử"]))].map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </div>
+        <div className="rpt-filter-item">
+          <span>Loại</span>
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">Tất cả</option>
+            <option value="income">Thu nhập</option>
+            <option value="expense">Chi tiêu</option>
+          </select>
+        </div>
+        <div className="rpt-filter-item">
+          <span>Danh mục</span>
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="">Tất cả</option>
+            {categories.map((item) => (
+              <option key={item.id} value={String(item.id)}>{item.name}</option>
+            ))}
+          </select>
+        </div>
+        {(hasClientFilters) && (
+          <button className="rpt-filter-reset" type="button" onClick={() => { setTypeFilter(""); setCategoryFilter(""); setSourceFilter(""); }}>
+            Xóa lọc
+          </button>
+        )}
+      </div>
+
       <div className="rpt-kpi-row">
         <div className="rpt-kpi-card">
           <div className="rpt-kpi-icon income"><TrendUpIcon/></div>
           <div className="rpt-kpi-text">
              <label>Tổng thu nhập</label>
-             <h3 className="income">{currency(summary?.total_income || 0)}</h3>
+             <h3 className="income">{currency(derivedSummary?.total_income || 0)}</h3>
              <div className={`rpt-kpi-delta ${dInc >= 0 ? "up" : "down"}`}>
                {dInc >= 0 ? '↑' : '↓'} {(Math.abs(dInc * 100)).toFixed(1)}% <span className="muted">với tháng trước</span>
              </div>
@@ -285,7 +468,7 @@ export default function ReportsScreen({
           <div className="rpt-kpi-icon expense"><TrendDownIcon/></div>
           <div className="rpt-kpi-text">
              <label>Tổng chi tiêu</label>
-             <h3 className="expense">{currency(summary?.total_expense || 0)}</h3>
+             <h3 className="expense">{currency(derivedSummary?.total_expense || 0)}</h3>
              <div className={`rpt-kpi-delta ${dExp > 0 ? "down" : "up"}`}>
                {dExp > 0 ? '↓' : '↑'} {(Math.abs(dExp * 100)).toFixed(1)}% <span className="muted">với tháng trước</span>
              </div>
@@ -319,7 +502,7 @@ export default function ReportsScreen({
           <div className="rpt-kpi-text">
              <label>Ngân sách đã dùng</label>
              <h3 className="expense">
-               {summary?.total_income ? `${Math.min(999, ((summary?.total_expense || 0) / (summary?.total_income || 1) * 100)).toFixed(1)}%` : "0%"}
+               {derivedSummary?.total_income ? `${Math.min(999, ((derivedSummary?.total_expense || 0) / (derivedSummary?.total_income || 1) * 100)).toFixed(1)}%` : "0%"}
              </h3>
              <div className="rpt-kpi-delta up">
                Theo kỳ lọc hiện tại

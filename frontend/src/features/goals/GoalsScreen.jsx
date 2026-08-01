@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -61,6 +61,8 @@ export default function GoalsScreen({
   onCreateGoal,
   onUpdateGoal,
   onDeleteGoal,
+  onCreateContribution,
+  onListContributions,
   loading,
   aiSuggestions = []
 }) {
@@ -69,6 +71,7 @@ export default function GoalsScreen({
   const [showForm, setShowForm] = useState(false);
   const [selectedGoalId, setSelectedGoalId] = useState(null);
   const [contributeAmount, setContributeAmount] = useState("");
+  const [savingsHistory, setSavingsHistory] = useState([]);
 
   const normalizedGoals = useMemo(
     () =>
@@ -85,15 +88,23 @@ export default function GoalsScreen({
     [normalizedGoals, selectedGoalId]
   );
 
-  // Mock savings history for selected goal
-  const savingsHistory = useMemo(() => {
-    if (!selectedGoalId) return [];
-    return [
-      { id: 101, date: "2024-03-01", amount: 500000, description: "Tiết kiệm tháng 3", source: "Ngân hàng" },
-      { id: 102, date: "2024-02-15", amount: 200000, description: "Tiền thưởng dự án", source: "Tiền mặt" },
-      { id: 103, date: "2024-02-01", amount: 500000, description: "Tiết kiệm tháng 2", source: "Ngân hàng" },
-    ];
-  }, [selectedGoalId]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedGoalId || !onListContributions) {
+      setSavingsHistory([]);
+      return undefined;
+    }
+    onListContributions(selectedGoalId)
+      .then((items) => {
+        if (!cancelled) setSavingsHistory(Array.isArray(items) ? items : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSavingsHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGoalId, onListContributions]);
 
   const totalTarget = normalizedGoals.reduce((sum, item) => sum + Number(item.target_amount || 0), 0);
   const totalSaved = normalizedGoals.reduce((sum, item) => sum + Number(item.saved_amount || 0), 0);
@@ -141,11 +152,21 @@ export default function GoalsScreen({
     e.preventDefault();
     if (!selectedGoal || !contributeAmount) return;
     const amount = Number(contributeAmount);
-    const payload = {
-      ...selectedGoal,
-      saved_amount: Number(selectedGoal.saved_amount) + amount
-    };
-    await onUpdateGoal(selectedGoal.id, payload);
+    if (onCreateContribution) {
+      await onCreateContribution(selectedGoal.id, {
+        amount,
+        date: new Date().toISOString().slice(0, 10),
+        description: "Dong gop nhanh",
+        source: selectedGoal.funding_source || ""
+      });
+      const items = onListContributions ? await onListContributions(selectedGoal.id) : [];
+      setSavingsHistory(Array.isArray(items) ? items : []);
+    } else {
+      await onUpdateGoal(selectedGoal.id, {
+        ...selectedGoal,
+        saved_amount: Number(selectedGoal.saved_amount) + amount
+      });
+    }
     setContributeAmount("");
   };
 
@@ -170,8 +191,9 @@ export default function GoalsScreen({
     });
   };
 
-  const handleDelete = (e, id) => {
+  const handleDelete = (e, id, name) => {
     e.stopPropagation();
+    if (!window.confirm(`X?a m?c ti?u "${name || "n?y"}"?`)) return;
     onDeleteGoal(id);
     if (selectedGoalId === id) setSelectedGoalId(null);
   };
@@ -262,7 +284,7 @@ export default function GoalsScreen({
                         <button type="button" className="btn-edit" onClick={(e) => startEdit(e, item)}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button type="button" className="btn-delete" onClick={(e) => handleDelete(e, item.id)}>
+                        <button type="button" className="btn-delete" onClick={(e) => handleDelete(e, item.id, item.name)}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                       </td>
@@ -492,3 +514,4 @@ export default function GoalsScreen({
     </section>
   );
 }
+

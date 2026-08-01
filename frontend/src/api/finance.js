@@ -115,6 +115,15 @@ export const getReportsOverview = (params) =>
 
 export const listSavingsGoals = () => request("/finance/savings-goals");
 
+export const listSavingsContributions = (goalId) =>
+  request(`/finance/savings-goals/${goalId}/contributions`);
+
+export const createSavingsContribution = (goalId, payload) =>
+  request(`/finance/savings-goals/${goalId}/contributions`, {
+    method: "POST",
+    body: payload
+  });
+
 export const createSavingsGoal = (payload) =>
   request("/finance/savings-goals", {
     method: "POST",
@@ -169,9 +178,9 @@ export const bootstrapFinance = async () => {
   }
 };
 
-export const listBills = async () => {
+export const listBills = async (params) => {
   try {
-    return await request("/finance/bills");
+    return await request(`/finance/bills${buildQuery(params)}`);
   } catch (err) {
     if (err?.status === 404) return [];
     throw err;

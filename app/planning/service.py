@@ -3,11 +3,26 @@ from sqlalchemy.orm import Session
 from app.core.auth_context import RequestUser
 from app.planning import schemas, models
 
+
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _require_name(value: str | None, field_name: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field_name} is required")
+    return cleaned
+
+
 def create_budget(db: Session, current_user: RequestUser, payload: schemas.BudgetCreate) -> models.Budget:
     db_item = models.Budget(
         user_id=current_user.id,
-        category_ids=payload.category_ids,
-        name=payload.name,
+        category_ids=_clean_optional_text(payload.category_ids),
+        name=_clean_optional_text(payload.name),
         amount=payload.amount,
         cycle=payload.cycle,
         start_date=payload.start_date,
@@ -29,6 +44,12 @@ def update_budget(db: Session, current_user: RequestUser, budget_id: int, payloa
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found")
     
     data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No budget changes provided")
+    if "name" in data:
+        data["name"] = _clean_optional_text(data.get("name"))
+    if "category_ids" in data:
+        data["category_ids"] = _clean_optional_text(data.get("category_ids"))
     for key, value in data.items():
         setattr(db_item, key, value)
         
@@ -46,7 +67,7 @@ def delete_budget(db: Session, current_user: RequestUser, budget_id: int) -> Non
 def create_goal(db: Session, current_user: RequestUser, payload: schemas.GoalCreate) -> models.Goal:
     db_item = models.Goal(
         user_id=current_user.id,
-        name=payload.name.strip(),
+        name=_require_name(payload.name, "Goal name"),
         target_amount=payload.target_amount,
         target_date=payload.target_date,
     )
@@ -64,8 +85,10 @@ def update_goal(db: Session, current_user: RequestUser, goal_id: int, payload: s
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
     
     data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No goal changes provided")
     if "name" in data and isinstance(data["name"], str):
-        data["name"] = data["name"].strip()
+        data["name"] = _require_name(data["name"], "Goal name")
         
     for key, value in data.items():
         setattr(db_item, key, value)

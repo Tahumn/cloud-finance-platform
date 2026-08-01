@@ -43,11 +43,14 @@ def on_startup() -> None:
         finance_models.Transaction,
         finance_models.Tag,
         finance_models.Account,
+        finance_models.AccountUpdateHistory,
         finance_models.Transfer,
         finance_models.Budget,
         finance_models.SavingsGoal,
+        finance_models.SavingsContribution,
         finance_models.Bill,
         ai_models.ChatMessage,
+        ai_models.PendingChatAction,
     )
 
 app.include_router(auth_router, prefix="/api/v1")
@@ -62,3 +65,4 @@ if not os.path.exists("uploads"):
 
 app.mount("/ws", socket_app)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+

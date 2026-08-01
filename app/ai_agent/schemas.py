@@ -34,6 +34,8 @@ class ChatResponse(BaseModel):
     end_date: DateType | None = None
     category_name: str | None = None
     total: float | None = None
+    requires_confirmation: bool = False
+    pending_action_id: int | None = None
 
 
 class ChatMessageRead(BaseModel):

@@ -17,3 +17,14 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     intent = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PendingChatAction(Base):
+    __tablename__ = 'pending_chat_actions'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, unique=True, index=True)
+    action_type = Column(String(50), nullable=False)
+    payload = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

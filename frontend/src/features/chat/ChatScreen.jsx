@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { chatWithAi, getForecast, getAnomalies, getSavingsTips } from "../../api/ai.js";
+import { chatWithAi, getAnomalies, getChatHistory, getForecast, getSavingsTips } from "../../api/ai.js";
 import { currency } from "../../utils/format.js";
 import { t } from "../../utils/i18n.js";
 
@@ -24,66 +24,6 @@ const pickVariant = (seed, variants) => {
     hash = (hash + seed.charCodeAt(i) * (i + 1)) % variants.length;
   }
   return variants[hash];
-};
-
-const buildMockReply = (text) => {
-  const normalized = normalizeText(text);
-  const groups = [
-    {
-      keywords: ["tiet kiem", "tich luy", "saving", "ky luat"],
-      replies: ["chat.reply.saving_1", "chat.reply.saving_2", "chat.reply.saving_3"]
-    },
-    {
-      keywords: ["ngan sach", "budget", "ke hoach chi"],
-      replies: ["chat.reply.budget_1", "chat.reply.budget_2", "chat.reply.budget_3"]
-    },
-    {
-      keywords: [
-        "chi tieu",
-        "chi phi",
-        "expense",
-        "mua sam",
-        "an uong",
-        "di lai",
-        "hoa don",
-        "subscription"
-      ],
-      replies: ["chat.reply.spend_1", "chat.reply.spend_2", "chat.reply.spend_3"]
-    },
-    {
-      keywords: ["thu nhap", "income", "luong", "tang thu", "thuong"],
-      replies: ["chat.reply.income_1", "chat.reply.income_2", "chat.reply.income_3"]
-    },
-    {
-      keywords: ["no", "tra no", "vay", "lai suat", "the tin dung", "credit"],
-      replies: ["chat.reply.debt_1", "chat.reply.debt_2", "chat.reply.debt_3"]
-    },
-    {
-      keywords: ["dau tu", "invest", "co phieu", "trai phieu", "quy", "etf", "vang"],
-      replies: ["chat.reply.invest_1", "chat.reply.invest_2", "chat.reply.invest_3"]
-    },
-    {
-      keywords: ["quy du phong", "khan cap", "emergency"],
-      replies: ["chat.reply.emergency_1", "chat.reply.emergency_2", "chat.reply.emergency_3"]
-    },
-    {
-      keywords: ["muc tieu", "ke hoach", "mua nha", "mua xe", "du lich"],
-      replies: ["chat.reply.goal_1", "chat.reply.goal_2", "chat.reply.goal_3"]
-    },
-    {
-      keywords: ["theo doi", "ghi chep", "bao cao", "kiem soat", "thong ke"],
-      replies: ["chat.reply.track_1", "chat.reply.track_2", "chat.reply.track_3"]
-    }
-  ];
-
-  for (const group of groups) {
-    if (group.keywords.some((keyword) => normalized.includes(keyword))) {
-      const key = pickVariant(normalized, group.replies);
-      return t(key);
-    }
-  }
-
-  return t("chat.reply.default", { text });
 };
 
 export default function ChatScreen({ userEmail }) {
@@ -130,23 +70,56 @@ export default function ChatScreen({ userEmail }) {
   const storageKey = useMemo(() => buildStorageKey(userEmail), [userEmail]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoaded(false);
-    if (!userEmail) {
-      setMessages(seedMessages);
-      setLoaded(true);
-      return;
-    }
-    const raw = localStorage.getItem(storageKey);
-    if (raw) {
-      try {
-        setMessages(JSON.parse(raw));
-      } catch {
+
+    const fallbackToLocal = () => {
+      if (!userEmail) {
+        setMessages(seedMessages);
+        setLoaded(true);
+        return;
+      }
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        try {
+          setMessages(JSON.parse(raw));
+        } catch {
+          setMessages(seedMessages);
+        }
+      } else {
         setMessages(seedMessages);
       }
-    } else {
-      setMessages(seedMessages);
-    }
-    setLoaded(true);
+      setLoaded(true);
+    };
+
+    const load = async () => {
+      if (!userEmail) {
+        fallbackToLocal();
+        return;
+      }
+      try {
+        const response = await getChatHistory(50);
+        const history = Array.isArray(response?.messages)
+          ? response.messages.map((item, index) => ({
+              id: item.id || `history-${index}`,
+              role: item.role,
+              content: item.content,
+              created_at: item.created_at || Date.now()
+            }))
+          : [];
+        if (!cancelled) {
+          setMessages(history.length ? history : seedMessages);
+          setLoaded(true);
+        }
+      } catch {
+        if (!cancelled) fallbackToLocal();
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [storageKey, userEmail]);
 
   useEffect(() => {
@@ -227,7 +200,7 @@ export default function ChatScreen({ userEmail }) {
     }
 
     if (!reply) {
-      reply = buildMockReply(text);
+      reply = "Khong the lay phan hoi tu AI luc nay. Vui long thu lai.";
     }
 
     setIsTyping(false);

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import Table
 
-from app.ai_agent.models import ChatMessage
+from app.ai_agent.models import ChatMessage, PendingChatAction
 from app.auth.models import EmailOTP, User
 from app.finance import models as finance_models
 
@@ -30,11 +30,13 @@ def get_tables_for_scope(scope: str) -> list[Table]:
         finance_models.Category.__table__,
         finance_models.Tag.__table__,
         finance_models.Account.__table__,
+        finance_models.AccountUpdateHistory.__table__,
         finance_models.Transaction.__table__,
         finance_models.Transfer.__table__,
         finance_models.transaction_tags,
         finance_models.Budget.__table__,
         finance_models.SavingsGoal.__table__,
+        finance_models.SavingsContribution.__table__,
         finance_models.Bill.__table__,
     ]
     planning_tables = [
@@ -48,6 +50,7 @@ def get_tables_for_scope(scope: str) -> list[Table]:
     ]
     ai_tables = [
         ChatMessage.__table__,
+        PendingChatAction.__table__,
     ]
 
     by_scope = {
@@ -61,4 +64,5 @@ def get_tables_for_scope(scope: str) -> list[Table]:
     }
 
     return _unique_tables(by_scope.get(normalized, by_scope["monolith"]))
+
 

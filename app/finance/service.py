@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload, joinedload
 
 from app.core.auth_context import RequestUser
 from app.finance import schemas
-from app.finance.models import Account, Bill, Budget, Category, SavingsGoal, Tag, Transaction
+from app.finance.models import Account, AccountUpdateHistory, Bill, Budget, Category, SavingsContribution, SavingsGoal, Tag, Transaction
 from app.realtime import emit_finance_update
 from app.core.kafka import producer_manager
 
@@ -105,14 +105,19 @@ def delete_category(db: Session, current_user: RequestUser, category_id: int) ->
     if not db_category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
-    # Remove dependent budgets first, then detach from transactions to avoid FK violations.
     db.query(Budget).filter(Budget.user_id == current_user.id, Budget.category_id == category_id).delete()
     db.query(Transaction).filter(Transaction.user_id == current_user.id, Transaction.category_id == category_id).update(
+        {"category_id": None}, synchronize_session=False
+    )
+    db.query(Bill).filter(Bill.user_id == current_user.id, Bill.category_id == category_id).update(
         {"category_id": None}, synchronize_session=False
     )
     db.delete(db_category)
     db.commit()
     emit_finance_update("categories", current_user.id, category_id)
+    emit_finance_update("budgets", current_user.id, None)
+    emit_finance_update("transactions", current_user.id, None)
+    emit_finance_update("bills", current_user.id, None)
 
 
 def _validate_category_ownership(db: Session, current_user: RequestUser, category_id: int | None) -> None:
@@ -165,11 +170,21 @@ def create_account(db: Session, current_user: RequestUser, payload: schemas.Acco
         provider=(payload.provider or "").strip() or None,
         last4=last4 or None,
         balance=float(payload.balance or 0.0),
+        credit_limit=float(payload.credit_limit) if payload.credit_limit is not None else None,
         note=(payload.note or "").strip() or None,
         color=payload.color or "#ec4899",
         currency=payload.currency or "VND",
     )
     db.add(item)
+    db.flush()
+    db.add(AccountUpdateHistory(
+        user_id=current_user.id,
+        account_id=item.id,
+        action="create",
+        item_name=item.name,
+        change_amount=float(item.balance or 0.0),
+        performer=current_user.email or current_user.username or "user",
+    ))
     db.commit()
     db.refresh(item)
     emit_finance_update("accounts", current_user.id, item.id)
@@ -185,6 +200,7 @@ def update_account(db: Session, current_user: RequestUser, account_id: int, payl
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
+    old_balance = float(item.balance or 0.0)
     data = payload.model_dump(exclude_unset=True)
     if "name" in data:
         name = (data.get("name") or "").strip()
@@ -208,6 +224,8 @@ def update_account(db: Session, current_user: RequestUser, account_id: int, payl
         item.last4 = last4[-4:] if last4 else None
     if "balance" in data and data.get("balance") is not None:
         item.balance = float(data["balance"] or 0.0)
+    if "credit_limit" in data:
+        item.credit_limit = float(data["credit_limit"]) if data.get("credit_limit") is not None else None
     if "note" in data:
         item.note = (data.get("note") or "").strip() or None
     if "color" in data and data.get("color"):
@@ -215,6 +233,16 @@ def update_account(db: Session, current_user: RequestUser, account_id: int, payl
     if "currency" in data and data.get("currency"):
         item.currency = data["currency"]
 
+    new_balance = float(item.balance or 0.0)
+    if new_balance != old_balance:
+        db.add(AccountUpdateHistory(
+            user_id=current_user.id,
+            account_id=item.id,
+            action="update",
+            item_name=item.name,
+            change_amount=new_balance - old_balance,
+            performer=current_user.email or current_user.username or "user",
+        ))
     db.commit()
     db.refresh(item)
     emit_finance_update("accounts", current_user.id, item.id)
@@ -233,11 +261,29 @@ def delete_account(db: Session, current_user: RequestUser, account_id: int) -> N
     db.query(Transaction).filter(Transaction.user_id == current_user.id, Transaction.account_id == account_id).update(
         {"account_id": None}, synchronize_session=False
     )
+    db.query(Bill).filter(Bill.user_id == current_user.id, Bill.account_id == account_id).update(
+        {"account_id": None}, synchronize_session=False
+    )
+    db.query(AccountUpdateHistory).filter(
+        AccountUpdateHistory.user_id == current_user.id,
+        AccountUpdateHistory.account_id == account_id,
+    ).delete(synchronize_session=False)
     db.delete(item)
     db.commit()
     emit_finance_update("accounts", current_user.id, account_id)
+    emit_finance_update("transactions", current_user.id, None)
+    emit_finance_update("bills", current_user.id, None)
 
 
+
+def list_account_history(db: Session, current_user: RequestUser) -> list[AccountUpdateHistory]:
+    return (
+        db.query(AccountUpdateHistory)
+        .filter(AccountUpdateHistory.user_id == current_user.id)
+        .order_by(AccountUpdateHistory.created_at.desc(), AccountUpdateHistory.id.desc())
+        .limit(100)
+        .all()
+    )
 def _load_tags(db: Session, current_user: RequestUser, tag_ids: list[int] | None) -> list[Tag]:
     if not tag_ids:
         return []
@@ -308,12 +354,19 @@ def update_tag(db: Session, current_user: RequestUser, tag_id: int, payload: sch
 
 
 def delete_tag(db: Session, current_user: RequestUser, tag_id: int) -> None:
-    db_tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == current_user.id).first()
+    db_tag = (
+        db.query(Tag)
+        .options(selectinload(Tag.transactions))
+        .filter(Tag.id == tag_id, Tag.user_id == current_user.id)
+        .first()
+    )
     if not db_tag:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+    db_tag.transactions = []
     db.delete(db_tag)
     db.commit()
     emit_finance_update("tags", current_user.id, tag_id)
+    emit_finance_update("transactions", current_user.id, None)
 
 
 def _adjust_account_balance(db: Session, account_id: int | None, amount: float, tx_type: str, reverse: bool = False) -> None:
@@ -952,7 +1005,37 @@ def update_budget(
     if not budget:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found")
 
-    budget.amount = payload.amount
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No budget changes provided")
+
+    if "category_id" in data:
+        category_id = data.get("category_id")
+        if category_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category is required")
+        category = (
+            db.query(Category)
+            .filter(Category.id == category_id, Category.user_id == current_user.id)
+            .first()
+        )
+        if not category:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        exists = (
+            db.query(Budget)
+            .filter(Budget.user_id == current_user.id, Budget.category_id == category_id, Budget.id != budget_id)
+            .first()
+        )
+        if exists:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Budget already exists for this category")
+        budget.category_id = category_id
+
+    if "amount" in data and data.get("amount") is not None:
+        budget.amount = data["amount"]
+    if "period_start" in data:
+        budget.start_date = data.get("period_start")
+    if "period_end" in data:
+        budget.end_date = data.get("period_end")
+
     db.commit()
     db.refresh(budget)
     emit_finance_update("budgets", current_user.id, budget.id)
@@ -962,16 +1045,31 @@ def update_budget(
         .filter(Category.id == budget.category_id, Category.user_id == current_user.id)
         .first()
     )
+    spent = (
+        db.query(func.coalesce(func.sum(Transaction.amount), 0.0))
+        .filter(
+            Transaction.user_id == current_user.id,
+            Transaction.category_id == budget.category_id,
+            Transaction.transaction_type == "expense",
+        )
+        .scalar()
+    )
+    spent_value = float(spent or 0.0)
+    amount_value = float(budget.amount or 0.0)
+    progress = (spent_value / amount_value * 100) if amount_value > 0 else 0.0
+    remaining = amount_value - spent_value
     return schemas.BudgetRead(
         id=budget.id,
         user_id=budget.user_id,
         category_id=budget.category_id,
         category=category.name if category else "Uncategorized",
-        amount=float(budget.amount or 0.0),
-        spent=0.0,
-        remaining=float(budget.amount or 0.0),
-        progress=0.0,
-        status="normal",
+        amount=amount_value,
+        period_start=budget.start_date,
+        period_end=budget.end_date,
+        spent=spent_value,
+        remaining=remaining,
+        progress=progress,
+        status=_budget_status(progress),
     )
 
 
@@ -1107,11 +1205,64 @@ def delete_savings_goal(db: Session, current_user: RequestUser, goal_id: int) ->
     )
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Savings goal not found")
+    db.query(SavingsContribution).filter(
+        SavingsContribution.user_id == current_user.id,
+        SavingsContribution.goal_id == goal_id,
+    ).delete(synchronize_session=False)
     db.delete(item)
     db.commit()
     emit_finance_update("goals", current_user.id, goal_id)
 
 
+
+def create_savings_contribution(
+    db: Session,
+    current_user: RequestUser,
+    goal_id: int,
+    payload: schemas.SavingsContributionCreate,
+) -> SavingsContribution:
+    goal = (
+        db.query(SavingsGoal)
+        .filter(SavingsGoal.id == goal_id, SavingsGoal.user_id == current_user.id)
+        .first()
+    )
+    if not goal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Savings goal not found")
+
+    item = SavingsContribution(
+        user_id=current_user.id,
+        goal_id=goal.id,
+        amount=float(payload.amount),
+        date=payload.date or date.today(),
+        description=(payload.description or "").strip() or None,
+        source=(payload.source or "").strip() or None,
+    )
+    goal.saved_amount = float(goal.saved_amount or 0.0) + float(payload.amount)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    emit_finance_update("goals", current_user.id, goal.id)
+    return item
+
+
+def list_savings_contributions(
+    db: Session,
+    current_user: RequestUser,
+    goal_id: int,
+) -> list[SavingsContribution]:
+    goal = (
+        db.query(SavingsGoal.id)
+        .filter(SavingsGoal.id == goal_id, SavingsGoal.user_id == current_user.id)
+        .first()
+    )
+    if not goal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Savings goal not found")
+    return (
+        db.query(SavingsContribution)
+        .filter(SavingsContribution.user_id == current_user.id, SavingsContribution.goal_id == goal_id)
+        .order_by(SavingsContribution.date.desc(), SavingsContribution.id.desc())
+        .all()
+    )
 def bootstrap_finance_data(db: Session, current_user: RequestUser) -> dict:
     created_categories = 0
     created_tags = 0
@@ -1251,3 +1402,4 @@ def delete_bill(db: Session, current_user: RequestUser, bill_id: int) -> None:
     db.delete(item)
     db.commit()
     emit_finance_update("bills", current_user.id, bill_id)
+

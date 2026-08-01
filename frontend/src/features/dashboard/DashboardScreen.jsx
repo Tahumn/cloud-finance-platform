@@ -319,9 +319,8 @@ export default function DashboardScreen({
           <div className="dbc-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <p>Số dư hiện tại</p>
             <button
-              className="icon-btn"
               onClick={() => setShowBalance(!showBalance)}
-              style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex', opacity: 0.8 }}
+              className="dbc-visibility-btn"
               title={showBalance ? "Ẩn số dư" : "Hiện số dư"}
             >
               {showBalance ? (
@@ -333,13 +332,13 @@ export default function DashboardScreen({
           </div>
           <h2>{showBalance ? currency(summary?.balance || 0) : '****** đ'}</h2>
           <p className="dbc-update">Cập nhật lúc {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
-          <button className="dbc-btn-add" onClick={onGoAddTransaction} style={{ marginTop: '16px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', padding: '8px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button className="dbc-btn-add" onClick={onGoAddTransaction}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             Thêm giao dịch
           </button>
         </div>
         <div className="dbc-graphic">
-          <svg viewBox="0 0 24 24" width="80" height="80" fill="white" opacity="0.8">
+          <svg viewBox="0 0 24 24" width="80" height="80" fill="currentColor" opacity="0.8">
             <path d="M20 12V22H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16v5" stroke="currentColor" strokeWidth="1" fill="none" />
             <path d="M20 12a2 2 0 0 0-2 2 2 2 0 0 0 2 2h4v-4z" stroke="currentColor" strokeWidth="1" fill="none" />
             <circle cx="16" cy="14" r="1" />
@@ -401,10 +400,10 @@ export default function DashboardScreen({
                         <stop offset="95%" stopColor="#ec4899" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
-                    <XAxis dataKey="label" />
-                    <YAxis />
-                    <Tooltip formatter={(v) => currency(v)} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="label" tick={{ fill: "var(--muted)", fontSize: 12 }} axisLine={{ stroke: "var(--border)" }} tickLine={{ stroke: "var(--border)" }} />
+                    <YAxis tick={{ fill: "var(--muted)", fontSize: 12 }} axisLine={{ stroke: "var(--border)" }} tickLine={{ stroke: "var(--border)" }} />
+                    <Tooltip formatter={(v) => currency(v)} contentStyle={{ background: "var(--bg-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12 }} />
                     <Area type="monotone" dataKey="income" stroke="#10b981" fill="url(#dashIncome)" strokeWidth={2.4} dot={false} activeDot={{ r: 4 }} />
                     <Area type="monotone" dataKey="expense" stroke="#ec4899" fill="url(#dashExpense)" strokeWidth={2.4} dot={false} activeDot={{ r: 4 }} />
                   </AreaChart>
@@ -454,10 +453,10 @@ export default function DashboardScreen({
                     paddingAngle={2}
                   >
                     {donutItems.map((item) => (
-                      <Cell key={item.category} fill={item.isOther ? "#cbd5e1" : colorFor(item.category, userEmail)} />
+                      <Cell key={item.category} fill={item.isOther ? "var(--border)" : colorFor(item.category, userEmail)} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v) => currency(v)} />
+                  <Tooltip formatter={(v) => currency(v)} contentStyle={{ background: "var(--bg-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="donut-center-text">
@@ -468,7 +467,7 @@ export default function DashboardScreen({
             <div className="donut-legend-list">
               {donutItems.map((item) => (
                 <div key={item.category} className="dll-item">
-                  <span className="dll-dot" style={{ background: item.isOther ? "#cbd5e1" : colorFor(item.category, userEmail) }}></span>
+                  <span className="dll-dot" style={{ background: item.isOther ? "var(--border)" : colorFor(item.category, userEmail) }}></span>
                   <span className="dll-label">{item.category}</span>
                   <span className="dll-value">{currency(item.spent)}</span>
                   <span className="dll-pct">{percent(item.share)}</span>
@@ -506,7 +505,7 @@ export default function DashboardScreen({
                 </div>
               </div>
             )) : (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div className="budget-empty-state">
                 <p className="empty">Chưa có ngân sách nào.</p>
                 <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Thiết lập ngân sách để theo dõi chi tiêu.</p>
               </div>
@@ -562,7 +561,7 @@ export default function DashboardScreen({
                     <p>{message}</p>
                     <span>Dữ liệu được cập nhật theo giao dịch trong kỳ đã chọn.</span>
                   </div>
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#cbd5e1" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--muted)" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
                 </div>
               ))}
             </div>

@@ -96,3 +96,21 @@ def password_reset_confirm(
 def me(current_user: User = Depends(service.get_current_active_user)):
     return current_user
 
+
+@router.patch("/me", response_model=schemas.UserRead)
+def update_me(
+    payload: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(service.get_current_active_user),
+):
+    return service.update_profile(db, current_user, payload)
+
+
+@router.post("/change-password")
+def change_password(
+    payload: schemas.ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(service.get_current_active_user),
+):
+    return service.change_password(db, current_user, payload)
+

@@ -11,6 +11,20 @@ from app.core.auth_context import RequestUser
 from app.recurring import models, schemas
 
 
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _require_name(value: str | None, field_name: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field_name} is required")
+    return cleaned
+
+
 def _service_url(env_key: str, default: str) -> str:
     return os.getenv(env_key, default).rstrip("/")
 
@@ -70,9 +84,17 @@ def create_subscription(
     current_user: RequestUser,
     payload: schemas.SubscriptionCreate,
 ) -> models.Subscription:
+    name = _require_name(payload.name, "Subscription name")
+    exists = (
+        db.query(models.Subscription)
+        .filter(models.Subscription.user_id == current_user.id, models.Subscription.name == name)
+        .first()
+    )
+    if exists:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subscription already exists")
     db_item = models.Subscription(
         user_id=current_user.id,
-        name=payload.name.strip(),
+        name=name,
         amount=payload.amount,
         start_date=payload.start_date,
         frequency=payload.frequency,
@@ -103,8 +125,21 @@ def update_subscription(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription not found")
 
     data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No subscription changes provided")
     if "name" in data and isinstance(data["name"], str):
-        data["name"] = data["name"].strip()
+        data["name"] = _require_name(data["name"], "Subscription name")
+        exists = (
+            db.query(models.Subscription)
+            .filter(
+                models.Subscription.user_id == current_user.id,
+                models.Subscription.name == data["name"],
+                models.Subscription.id != item_id,
+            )
+            .first()
+        )
+        if exists:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subscription already exists")
 
     for key, value in data.items():
         setattr(db_item, key, value)
@@ -129,7 +164,7 @@ def delete_subscription(db: Session, current_user: RequestUser, item_id: int) ->
 def create_debt(db: Session, current_user: RequestUser, payload: schemas.DebtCreate) -> models.Debt:
     db_item = models.Debt(
         user_id=current_user.id,
-        name=payload.name.strip(),
+        name=_require_name(payload.name, "Debt name"),
         amount=payload.amount,
         due_date=payload.due_date,
         frequency=payload.frequency,
@@ -159,8 +194,10 @@ def update_debt(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Debt not found")
 
     data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No debt changes provided")
     if "name" in data and isinstance(data["name"], str):
-        data["name"] = data["name"].strip()
+        data["name"] = _require_name(data["name"], "Debt name")
 
     for key, value in data.items():
         setattr(db_item, key, value)
@@ -189,7 +226,7 @@ def create_reminder(
 ) -> models.Reminder:
     db_item = models.Reminder(
         user_id=current_user.id,
-        label=payload.label.strip(),
+        label=_require_name(payload.label, "Reminder label"),
         remind_date=payload.remind_date,
         channel=payload.channel,
     )
@@ -218,8 +255,10 @@ def update_reminder(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reminder not found")
 
     data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No reminder changes provided")
     if "label" in data and isinstance(data["label"], str):
-        data["label"] = data["label"].strip()
+        data["label"] = _require_name(data["label"], "Reminder label")
 
     for key, value in data.items():
         setattr(db_item, key, value)

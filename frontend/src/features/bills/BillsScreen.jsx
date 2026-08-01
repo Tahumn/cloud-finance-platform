@@ -28,6 +28,7 @@ export default function BillsScreen({
   loading = false,
   onGoOcr,
   onCreateTransaction,
+  onCreateBill,
   onUpdateBill,
   onDeleteBill,
   newlyCreatedId
@@ -41,6 +42,7 @@ export default function BillsScreen({
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [editData, setEditData] = useState(null);
   const [formError, setFormError] = useState("");
 
@@ -84,8 +86,28 @@ export default function BillsScreen({
     }
   };
 
+  const emptyBillForm = () => ({
+    merchant: "",
+    date: new Date().toISOString().slice(0, 10),
+    category_id: categories[0]?.id || "",
+    account_id: accounts[0]?.id || "",
+    total_amount: 0,
+    vat_amount: 0,
+    bill_number: "",
+    notes: ""
+  });
+
+  const handleStartCreate = () => {
+    setSelectedId(null);
+    setEditData(emptyBillForm());
+    setFormError("");
+    setIsCreating(true);
+    setIsEditing(true);
+  };
+
   const handleStartEdit = () => {
     if (!selected) return;
+    setIsCreating(false);
     setEditData({
       merchant: selected.merchant || "",
       date: selected.date || "",
@@ -101,7 +123,7 @@ export default function BillsScreen({
   };
 
   const handleSaveEdit = async () => {
-    if (!onUpdateBill || !selected || !editData) return;
+    if ((!onUpdateBill && !isCreating) || (!onCreateBill && isCreating) || (!selected && !isCreating) || !editData) return;
 
     // Validation
     if (!editData.merchant.trim()) return setFormError("Vui lòng nhập tên nhà hàng/merchant.");
@@ -112,7 +134,9 @@ export default function BillsScreen({
 
     setFormError("");
     try {
-      await onUpdateBill(selected.id, editData);
+      if (isCreating) await onCreateBill(editData);
+      else await onUpdateBill(selected.id, editData);
+      setIsCreating(false);
       setIsEditing(false);
       setEditData(null);
     } catch (err) {
@@ -122,6 +146,7 @@ export default function BillsScreen({
 
   const handleCancelEdit = () => {
     setIsEditing(false);
+    setIsCreating(false);
     setEditData(null);
   };
 
@@ -136,7 +161,7 @@ export default function BillsScreen({
             <button type="button" className="bill-btn secondary" onClick={onGoOcr}>
               <UploadIcon /> Nhập hóa đơn (tự động)
             </button>
-            <button type="button" className="bill-btn primary">
+            <button type="button" className="bill-btn primary" onClick={handleStartCreate}>
               <PlusIcon /> Nhập thủ công
             </button>
           </div>
@@ -236,7 +261,7 @@ export default function BillsScreen({
                         <tr
                           key={b.id}
                           className={`${selectedId === b.id ? "active" : ""} ${newlyCreatedId === b.id ? "new-item-flash" : ""}`}
-                          onClick={() => setSelectedId(b.id)}
+                          onClick={() => { setIsCreating(false); setSelectedId(b.id); }}
                         >
                           <td className="bill-merchant">
                             <div style={{ display: "flex", flexDirection: "column" }}>
@@ -279,16 +304,17 @@ export default function BillsScreen({
           <aside className="bill-detail-card">
             <div className="bill-detail-header">
               <h3>Chi tiết hóa đơn</h3>
-              {isEditing && <span className="bill-edit-badge">Đang chỉnh sửa</span>}
+              {isEditing && <span className="bill-edit-badge">{isCreating ? "Tao moi" : "Dang chinh sua"}</span>}
             </div>
 
             <div className="bill-detail-body">
-              {!selected ? (
+              {!selected && !isCreating ? (
                 <p style={{ color: "#6b7280", textAlign: "center" }}>Vui lòng chọn một hóa đơn để xem chi tiết.</p>
               ) : (
                 <>
-                  <div className="bill-receipt-img" onClick={() => selected.image_path && setIsModalOpen(true)}>
-                    {selected.image_path ? (
+                  {!isCreating && (
+                  <div className="bill-receipt-img" onClick={() => selected?.image_path && setIsModalOpen(true)}>
+                    {selected?.image_path ? (
                       <>
                         <img
                           src={`${getBaseUrl()}${selected.image_path}`}
@@ -308,6 +334,7 @@ export default function BillsScreen({
                       </>
                     )}
                   </div>
+                  )}
 
                   <div className="bill-info-section">
                     {isEditing ? (
@@ -470,7 +497,7 @@ export default function BillsScreen({
               )}
             </div>
 
-            {selected && (
+            {(selected || isCreating) && (
               <div className="bill-detail-actions">
                 {isEditing ? (
                   <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "12px" }}>
@@ -519,3 +546,4 @@ export default function BillsScreen({
     </>
   );
 }
+

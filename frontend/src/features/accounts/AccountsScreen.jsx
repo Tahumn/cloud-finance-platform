@@ -67,6 +67,8 @@ export default function AccountsScreen({
   const [form, setForm] = useState(emptyAccount);
   const [editingId, setEditingId] = useState(null);
   const [activeType, setActiveType] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [hideZeroBalance, setHideZeroBalance] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -117,15 +119,26 @@ export default function AccountsScreen({
   };
 
   const filteredAccounts = useMemo(() => {
-    if (activeType === "all") return accounts;
-    return accounts.filter((item) => item.type === activeType);
-  }, [accounts, activeType]);
+    let result = activeType === "all" ? [...accounts] : accounts.filter((item) => item.type === activeType);
+    if (hideZeroBalance) {
+      result = result.filter((item) => Number(item.balance || 0) !== 0);
+    }
+    result.sort((a, b) => {
+      if (sortOrder === "oldest") return a.id - b.id;
+      if (sortOrder === "balance_desc") return Number(b.balance || 0) - Number(a.balance || 0);
+      if (sortOrder === "balance_asc") return Number(a.balance || 0) - Number(b.balance || 0);
+      return b.id - a.id;
+    });
+    return result;
+  }, [accounts, activeType, hideZeroBalance, sortOrder]);
 
   const totalBalance = accounts.reduce((sum, item) => sum + Number(item.balance || 0), 0);
   const bankCount = accounts.filter(i => i.type === "bank").length;
   const cardCount = accounts.filter((item) => item.type === "credit").length;
-  // Mock monthly change for display purposes
-  const monthlyChange = -18750000;
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const monthlyChange = (history || [])
+    .filter((item) => String(item.created_at || "").slice(0, 7) === monthKey)
+    .reduce((sum, item) => sum + Number(item.change_amount || 0), 0);
 
   return (
     <section className="acc-page">

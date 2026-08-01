@@ -20,7 +20,11 @@ const UI_LAYOUTS = [
       cardRadius: "18px",
       panelPadding: "18px",
       gridGap: "18px",
-      panelShadow: "0 14px 30px rgba(16, 24, 40, 0.08)"
+      panelShadow: "0 14px 30px rgba(16, 24, 40, 0.08)",
+      sidebarWidth: "260px",
+      contentPadding: "32px",
+      topBarHeight: "72px",
+      pageTitleSize: "28px"
     }
   },
   {
@@ -30,13 +34,17 @@ const UI_LAYOUTS = [
     name: "Airy Space",
     description: "Rộng rãi, thoáng mắt",
     values: {
-      shellMax: "1240px",
-      shellMaxNarrow: "980px",
-      panelRadius: "26px",
-      cardRadius: "20px",
-      panelPadding: "22px",
-      gridGap: "22px",
-      panelShadow: "0 18px 36px rgba(16, 24, 40, 0.12)"
+      shellMax: "1320px",
+      shellMaxNarrow: "1080px",
+      panelRadius: "30px",
+      cardRadius: "24px",
+      panelPadding: "26px",
+      gridGap: "28px",
+      panelShadow: "0 22px 44px rgba(16, 24, 40, 0.14)",
+      sidebarWidth: "286px",
+      contentPadding: "40px",
+      topBarHeight: "78px",
+      pageTitleSize: "31px"
     }
   },
   {
@@ -46,13 +54,17 @@ const UI_LAYOUTS = [
     name: "Compact Focus",
     description: "Gọn gàng, tiết kiệm diện tích",
     values: {
-      shellMax: "1120px",
-      shellMaxNarrow: "880px",
-      panelRadius: "16px",
-      cardRadius: "14px",
-      panelPadding: "14px",
-      gridGap: "12px",
-      panelShadow: "0 10px 22px rgba(16, 24, 40, 0.08)"
+      shellMax: "1040px",
+      shellMaxNarrow: "820px",
+      panelRadius: "14px",
+      cardRadius: "12px",
+      panelPadding: "12px",
+      gridGap: "10px",
+      panelShadow: "0 8px 18px rgba(16, 24, 40, 0.08)",
+      sidebarWidth: "224px",
+      contentPadding: "20px",
+      topBarHeight: "64px",
+      pageTitleSize: "25px"
     }
   },
   {
@@ -62,13 +74,17 @@ const UI_LAYOUTS = [
     name: "Editorial",
     description: "Nhấn mạnh số liệu",
     values: {
-      shellMax: "1200px",
-      shellMaxNarrow: "960px",
-      panelRadius: "24px",
-      cardRadius: "16px",
-      panelPadding: "20px",
-      gridGap: "16px",
-      panelShadow: "0 16px 32px rgba(16, 24, 40, 0.1)"
+      shellMax: "1260px",
+      shellMaxNarrow: "1020px",
+      panelRadius: "18px",
+      cardRadius: "12px",
+      panelPadding: "24px",
+      gridGap: "20px",
+      panelShadow: "0 18px 34px rgba(16, 24, 40, 0.12)",
+      sidebarWidth: "246px",
+      contentPadding: "36px",
+      topBarHeight: "74px",
+      pageTitleSize: "34px"
     }
   }
 ];
@@ -248,7 +264,11 @@ const applyUiPrefs = (prefs) => {
     "--card-radius": layout.values.cardRadius,
     "--panel-padding": layout.values.panelPadding,
     "--grid-gap": layout.values.gridGap,
-    "--panel-shadow": layout.values.panelShadow
+    "--panel-shadow": layout.values.panelShadow,
+    "--sidebar-width": layout.values.sidebarWidth,
+    "--content-padding": layout.values.contentPadding,
+    "--topbar-height": layout.values.topBarHeight,
+    "--page-title-size": layout.values.pageTitleSize
   };
 
   Object.entries(variables).forEach(([key, value]) => {
