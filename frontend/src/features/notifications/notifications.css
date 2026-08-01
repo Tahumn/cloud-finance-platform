@@ -1,6 +1,6 @@
-.notif-layout {
+﻿.notif-layout {
   padding: 24px 32px;
-  background: #fdfdfd;
+  background: var(--bg);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -17,13 +17,13 @@
 .notif-title-area h2 {
   font-size: 26px;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--text);
   margin: 0 0 6px 0;
 }
 
 .notif-title-area p {
   font-size: 14px;
-  color: #64748b;
+  color: var(--muted);
   margin: 0;
 }
 
@@ -35,9 +35,9 @@
 .notif-btn-ghost {
   padding: 10px 18px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  color: #475569;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--muted);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -46,7 +46,7 @@
   gap: 8px;
   transition: all 0.2s;
 }
-.notif-btn-ghost:hover { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+.notif-btn-ghost:hover { background: var(--bg); border-color: var(--border); color: var(--text); }
 
 .notif-btn-danger {
   color: #ef4444;
@@ -57,7 +57,7 @@
   display: flex;
   gap: 12px;
   padding: 4px;
-  background: #f1f5f9;
+  background: var(--bg);
   border-radius: 14px;
   width: fit-content;
 }
@@ -67,7 +67,7 @@
   border-radius: 10px;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--muted);
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -75,7 +75,7 @@
 }
 
 .notif-tab.active {
-  background: white;
+  background: var(--bg-2);
   color: #f9206b;
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
@@ -91,8 +91,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s;
@@ -101,7 +101,7 @@
 
 .notif-card:hover {
   border-color: #8b5cf6;
-  background: #fdfcff;
+  background: var(--card-soft);
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.05);
 }
 
@@ -157,13 +157,13 @@
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text);
 }
 
 .notif-card p {
   margin: 0;
   font-size: 14px;
-  color: #64748b;
+  color: var(--muted);
   line-height: 1.4;
 }
 
@@ -175,7 +175,7 @@
 
 .notif-time {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--muted);
   font-weight: 500;
 }
 
@@ -193,7 +193,7 @@
   bottom: 80px;
   right: 40px;
   width: 320px;
-  background: white;
+  background: var(--bg-2);
   border-radius: 24px;
   box-shadow: 0 15px 50px rgba(0,0,0,0.15);
   display: flex;
@@ -220,7 +220,7 @@
 .ai-avatar {
   width: 32px;
   height: 32px;
-  background: white;
+  background: var(--bg-2);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -242,7 +242,7 @@
 
 .ai-msg {
   font-size: 14px;
-  color: #475569;
+  color: var(--muted);
   line-height: 1.5;
 }
 
@@ -255,9 +255,9 @@
   flex: 1;
   padding: 8px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #475569;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -281,3 +281,4 @@
   justify-content: center;
   gap: 8px;
 }
+
