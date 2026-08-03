@@ -287,12 +287,21 @@ def _split_transaction_segments(text: str) -> list[str]:
     if not text or not text.strip():
         return []
     parts = re.split(
-        r",|;|&|\b(?:va|và|nhung|nhưng|roi|rồi|sau do|sau đó|cung voi|cùng với|kem theo|kèm theo|kem|kèm)\b",
+        r",|;|&|\b(?:va|v\u00e0|nhung|nh\u01b0ng|roi|r\u1ed3i|sau do|sau \u0111\u00f3|cung voi|c\u00f9ng v\u1edbi|kem theo|k\u00e8m theo|kem|k\u00e8m)\b",
         text,
         flags=re.IGNORECASE,
     )
     parts = [part.strip(" ,.;") for part in parts if part and part.strip(" ,.;")]
     return parts if parts else [text.strip()]
+
+
+def _is_update_request(text: str) -> bool:
+    normalized = _normalize_text(text)
+    return bool(
+        re.search(r"^(?:sua|cap nhat|chinh sua|doi)\b", normalized)
+        or re.search(r"\b(?:sua|cap nhat|chinh sua|doi)\s+(?:giao dich|khoan)\b", normalized)
+        or re.search(r"\b(?:ghi|nhap)\s+nham\b", normalized)
+    )
 
 
 def _require_authorization(authorization: str | None) -> dict[str, str]:
@@ -1126,6 +1135,18 @@ def _is_cancellation(text: str) -> bool:
     return _normalize_text(text) in CANCELLATION_TEXTS
 
 
+def _looks_like_new_transaction_message(text: str) -> bool:
+    if _is_update_request(text) or any(keyword in _normalize_text(text) for keyword in DELETE_KEYWORDS):
+        return False
+    if _extract_amount(text) is None:
+        return False
+    normalized = _normalize_text(text)
+    return bool(
+        any(keyword in normalized for keyword in INCOME_KEYWORDS + EXPENSE_KEYWORDS)
+        or _pick_category_name(text)
+    )
+
+
 def _get_pending_action(db: Session, current_user: RequestUser) -> PendingChatAction | None:
     return (
         db.query(PendingChatAction)
@@ -1355,23 +1376,53 @@ def _store_resource_proposal(
     current_user: RequestUser,
     action_type: str,
     parsed: dict[str, Any],
+    authorization: str | None = None,
 ) -> dict[str, Any]:
+    _ = (db, current_user)
     if not parsed.get('amount'):
         return _response('Minh can so tien truoc khi thuc hien yeu cau nay.', 'ask_amount')
-    pending = _save_pending_action(db, current_user, action_type, parsed)
-    labels = {
-        'create_budget': 'tao ngan sach',
-        'create_debt': 'ghi khoan no',
-        'create_subscription': 'tao thanh toan dinh ky',
-    }
-    amount = float(parsed['amount'])
-    return _response(
-        f'Minh se {labels[action_type]} {amount:,.0f} VND. Tra loi Xac nhan de thuc hien hoac Huy de bo qua.',
-        f'confirm_{action_type}',
-        total=amount,
-        requires_confirmation=True,
-        pending_action_id=pending.id,
-    )
+
+    if action_type == 'create_budget':
+        category_id, category_name = _resolve_category(
+            parsed.get('description') or '',
+            parsed.get('category_name'),
+            True,
+            authorization,
+        )
+        if category_id is None:
+            return _response('Minh chua xac dinh duoc danh muc ngan sach.', 'ask_category')
+        request_payload = {
+            'category_id': category_id,
+            'amount': float(parsed['amount']),
+        }
+        _request_json('POST', '/budgets', authorization, payload=request_payload, service='finance')
+        return _response(
+            f"Da thiet lap ngan sach {request_payload['amount']:,.0f} VND.",
+            action_type,
+            total=request_payload['amount'],
+        )
+
+    if action_type == 'create_debt':
+        request_payload = {
+            'name': parsed.get('description') or 'Khoan no',
+            'amount': float(parsed['amount']),
+            'due_date': str(parsed.get('date') or DateType.today()),
+            'frequency': 'one_time',
+        }
+        _request_json('POST', '/debts', authorization, payload=request_payload, service='recurring')
+        return _response(f"Da ghi khoan no {request_payload['amount']:,.0f} VND.", action_type, total=request_payload['amount'])
+
+    if action_type == 'create_subscription':
+        request_payload = {
+            'name': parsed.get('description') or 'Thanh toan dinh ky',
+            'amount': float(parsed['amount']),
+            'frequency': parsed.get('frequency') or 'monthly',
+            'start_date': str(parsed.get('date') or DateType.today()),
+        }
+        _request_json('POST', '/subscriptions', authorization, payload=request_payload, service='recurring')
+        return _response(f"Da tao thanh toan dinh ky {request_payload['amount']:,.0f} VND.", action_type, total=request_payload['amount'])
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unsupported create action')
 
 
 def _execute_pending_action(
@@ -1471,6 +1522,9 @@ def _handle_pending_action(
         _clear_pending_action(db, pending)
         return response
     if pending.action_type != 'create_transaction':
+        if _looks_like_new_transaction_message(text):
+            _clear_pending_action(db, pending)
+            return None
         return _response(
             'Thao tac dang cho can xac nhan. Tra loi Xac nhan de thuc hien hoac Huy de bo qua.',
             'awaiting_confirmation',
@@ -1741,7 +1795,7 @@ def answer_chat(
     # Handle cases like: "Duoc me cho 500k, an het 100k, do xang 50k"
     # even when Gemini fails to return `is_multiple=true`.
     segments = _split_transaction_segments(text)
-    if False and len(segments) >= 2:
+    if len(segments) >= 2:
         parsed_items: list[dict[str, Any]] = []
         for segment in segments:
             parsed_seg = parse_transaction_text(
@@ -1823,7 +1877,7 @@ def answer_chat(
         _persist_chat_messages(db, current_user, text, response)
         return response
 
-    if any(keyword in normalized for keyword in UPDATE_KEYWORDS):
+    if _is_update_request(text):
         response = _store_update_proposal(db, current_user, text, authorization)
         _persist_chat_messages(db, current_user, text, response)
         return response
@@ -1940,7 +1994,7 @@ def answer_chat(
         parsed["intent"] = "create_subscription"
 
     if parsed.get('intent') in {'create_budget', 'create_debt', 'create_subscription'}:
-        response = _store_resource_proposal(db, current_user, parsed['intent'], parsed)
+        response = _store_resource_proposal(db, current_user, parsed['intent'], parsed, authorization)
         _persist_chat_messages(db, current_user, text, response)
         return response
 
@@ -1974,7 +2028,7 @@ def answer_chat(
             return response
 
     if parsed.get("intent") == "create_budget":
-        response = _store_resource_proposal(db, current_user, 'create_budget', parsed)
+        response = _store_resource_proposal(db, current_user, 'create_budget', parsed, authorization)
         _persist_chat_messages(db, current_user, text, response)
         return response
         # Resolve category if provided
@@ -1992,7 +2046,7 @@ def answer_chat(
         return response
 
     if parsed.get("intent") == "create_debt":
-        response = _store_resource_proposal(db, current_user, 'create_debt', parsed)
+        response = _store_resource_proposal(db, current_user, 'create_debt', parsed, authorization)
         _persist_chat_messages(db, current_user, text, response)
         return response
         payload = {
@@ -2007,7 +2061,7 @@ def answer_chat(
         return response
 
     if parsed.get("intent") == "create_subscription":
-        response = _store_resource_proposal(db, current_user, 'create_subscription', parsed)
+        response = _store_resource_proposal(db, current_user, 'create_subscription', parsed, authorization)
         _persist_chat_messages(db, current_user, text, response)
         return response
         payload = {

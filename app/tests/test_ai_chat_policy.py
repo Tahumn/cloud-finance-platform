@@ -137,3 +137,120 @@ def test_non_transaction_chat_does_not_fall_into_ask_amount(monkeypatch):
 
     assert result["intent"] == "general_question"
     assert result["answer"] == "general:thoi tiet hom nay"
+
+
+def test_milk_tea_is_not_treated_as_update_request():
+    assert service._is_update_request("uống trà sữa hết 50k") is False
+    assert service._is_update_request("sửa giao dịch cà phê thành 60k") is True
+
+
+def test_vietnamese_and_splits_transactions():
+    text = "tôi vừa uống cà phê 50k, được mẹ cho 100k và uống trà sữa hết 50k"
+    assert service._split_transaction_segments(text) == [
+        "tôi vừa uống cà phê 50k",
+        "được mẹ cho 100k",
+        "uống trà sữa hết 50k",
+    ]
+
+
+def test_multiple_transactions_execute_without_confirmation(monkeypatch):
+    created = []
+    parsed_by_text = {
+        "tôi vừa uống cà phê 50k": {"amount": 50_000, "transaction_type": "expense", "category_name": "Ăn uống", "description": "Cà phê"},
+        "được mẹ cho 100k": {"amount": 100_000, "transaction_type": "income", "category_name": "Thu nhập khác", "description": "Mẹ cho"},
+        "uống trà sữa hết 50k": {"amount": 50_000, "transaction_type": "expense", "category_name": "Ăn uống", "description": "Trà sữa"},
+    }
+    monkeypatch.setattr(service, "_handle_pending_action", lambda *args, **kwargs: None)
+    monkeypatch.setattr(service, "_persist_chat_messages", lambda *args, **kwargs: None)
+    monkeypatch.setattr(service, "parse_transaction_text", lambda db, user, text, **kwargs: parsed_by_text[text])
+
+    def fake_create(parsed, **kwargs):
+        created.append(parsed)
+        return parsed.copy()
+
+    monkeypatch.setattr(service, "create_transaction_from_parsed", fake_create)
+    result = service.answer_chat(None, SimpleNamespace(id=1), "tôi vừa uống cà phê 50k, được mẹ cho 100k và uống trà sữa hết 50k", "Bearer token")
+
+    assert result["intent"] == "create_transaction"
+    assert result["total"] == 0
+    assert [item["transaction_type"] for item in created] == ["expense", "income", "expense"]
+    assert "requires_confirmation" not in result
+
+
+def test_new_transaction_clears_pending_update(monkeypatch):
+    cleared = []
+    pending = SimpleNamespace(
+        id=15,
+        action_type="update_transaction",
+        payload=json.dumps({"transaction_id": 42, "update": {"amount": 200_000}}),
+    )
+    monkeypatch.setattr(service, "_get_pending_action", lambda db, user: pending)
+    monkeypatch.setattr(service, "_clear_pending_action", lambda db, item: cleared.append(item.id))
+
+    result = service._handle_pending_action(
+        None,
+        SimpleNamespace(id=1),
+        "tôi vừa uống cà phê 50k, được mẹ cho 100k và uống trà sữa hết 50k",
+        "Bearer token",
+    )
+
+    assert result is None
+    assert cleared == [15]
+
+
+def test_confirmation_still_executes_pending_update(monkeypatch):
+    cleared = []
+    pending = SimpleNamespace(id=16, action_type="update_transaction", payload="{}")
+    monkeypatch.setattr(service, "_get_pending_action", lambda db, user: pending)
+    monkeypatch.setattr(service, "_clear_pending_action", lambda db, item: cleared.append(item.id))
+    monkeypatch.setattr(service, "_execute_pending_action", lambda db, item, authorization: {"intent": "update_transaction"})
+
+    result = service._handle_pending_action(None, SimpleNamespace(id=1), "xác nhận", "Bearer token")
+
+    assert result["intent"] == "update_transaction"
+    assert cleared == [16]
+
+
+def test_pending_update_is_replaced_by_new_transaction_message(monkeypatch):
+    cleared = []
+    pending = SimpleNamespace(
+        id=21,
+        action_type="update_transaction",
+        payload=json.dumps({"transaction_id": 42, "update": {"amount": 200_000}}),
+    )
+    monkeypatch.setattr(service, "_get_pending_action", lambda db, user: pending)
+    monkeypatch.setattr(service, "_clear_pending_action", lambda db, item: cleared.append(item.id))
+
+    result = service._handle_pending_action(
+        None,
+        SimpleNamespace(id=1),
+        "tôi vừa uống cà phê 50k, được mẹ cho 100k và uống trà sữa hết 50k",
+        "Bearer token",
+    )
+
+    assert result is None
+    assert cleared == [21]
+
+
+def test_create_budget_executes_without_confirmation(monkeypatch):
+    calls = []
+    monkeypatch.setattr(service, "_resolve_category", lambda *args, **kwargs: (7, "Mua sắm"))
+    monkeypatch.setattr(service, "_save_pending_action", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("create must not save pending action")))
+
+    def fake_request(method, path, authorization, payload=None, service=None, params=None):
+        calls.append((method, path, payload, service))
+        return {"id": 1}
+
+    monkeypatch.setattr(service, "_request_json", fake_request)
+    result = service._store_resource_proposal(
+        None,
+        None,
+        "create_budget",
+        {"amount": 7_000_000, "description": "ngân sách mua sắm", "category_name": "Mua sắm", "period": "monthly"},
+        "Bearer token",
+    )
+
+    assert calls == [("POST", "/budgets", {"category_id": 7, "amount": 7_000_000.0}, "finance")]
+    assert result["intent"] == "create_budget"
+    assert result["requires_confirmation"] is False
+    assert result["pending_action_id"] is None
