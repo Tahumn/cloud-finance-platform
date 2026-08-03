@@ -52,7 +52,8 @@ def test_google_auth_creates_user_for_new_email(monkeypatch):
     token = service.authenticate_google_user(session, schemas.GoogleAuthRequest(credential="token"))
 
     assert token.access_token
-    assert any(user.email == "ada@example.com" for user in session.added)
+    created_user = next(user for user in session.added if user.email == "ada@example.com")
+    assert created_user.onboarding_completed in (False, None)
 
 
 def test_google_auth_links_existing_email_account(monkeypatch):
@@ -62,6 +63,7 @@ def test_google_auth_links_existing_email_account(monkeypatch):
         hashed_password=hash_password("dummy"),
         email_verified=True,
         is_active=True,
+        onboarding_completed=True,
     )
     session = DummySession([existing])
 
@@ -80,3 +82,4 @@ def test_google_auth_links_existing_email_account(monkeypatch):
 
     assert token.access_token
     assert session.added == []
+    assert existing.onboarding_completed is True

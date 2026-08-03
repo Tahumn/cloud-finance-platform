@@ -78,12 +78,12 @@ import { applyUiPrefs, getUiPrefs, saveUiPrefs } from "./utils/uiPrefs.js";
 import {
   applyUserPrefs,
   getUserPrefs,
-  isOnboardingDone,
   saveUserPrefs,
   setActiveUserEmail,
   setOnboardingDone
 } from "./utils/userPrefs.js";
 import { t } from "./utils/i18n.js";
+import { hasCompletedOnboarding } from "./utils/onboarding.js";
 import {
   buildNotificationsFromData,
   buildTransactionNotification,
@@ -146,11 +146,6 @@ const defaultFilters = () => ({
   categoryId: "",
   tagId: ""
 });
-
-const hasCompletedOnboarding = (user) => {
-  if (!user?.email) return false;
-  return Boolean(user.onboarding_completed || isOnboardingDone(user.email));
-};
 
 const getSocketBase = () => {
   if (import.meta.env.VITE_API_BASE) {
