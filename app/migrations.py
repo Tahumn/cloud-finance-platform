@@ -17,7 +17,8 @@ def run_migrations(scope: str) -> None:
 
     cfg = Config(str(alembic_ini))
     cfg.set_main_option("script_location", str(alembic_dir))
-    cfg.set_main_option("sqlalchemy.url", _normalize_db_url(settings.db_url))
+    migration_url = _normalize_db_url(settings.db_url)
+    cfg.set_main_option("sqlalchemy.url", migration_url.replace("%", "%%"))
 
     # Pass runtime scope into Alembic env/revisions via context.get_x_argument().
     cfg.cmd_opts = Namespace(x=[f"scope={scope}"], tag=None, raiseerr=True)
