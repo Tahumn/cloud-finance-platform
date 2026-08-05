@@ -17,12 +17,6 @@ KAFKA_ENABLED = os.getenv("KAFKA_ENABLED", "false").strip().lower() in {
 }
 
 class KafkaProducerManager:
-    async def start(self):
-        if not KAFKA_ENABLED:
-            logger.info("Kafka producer disabled")
-            return
-    _instance: Optional["KafkaProducerManager"] = None
-
     def __init__(self):
         self.producer: Optional[AIOKafkaProducer] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -34,6 +28,9 @@ class KafkaProducerManager:
         return cls._instance
 
     async def start(self):
+        if not KAFKA_ENABLED:
+            logger.info("Kafka producer disabled")
+            return
         if not self.producer:
             self._loop = asyncio.get_running_loop()
             self.producer = AIOKafkaProducer(
@@ -101,10 +98,6 @@ class KafkaProducerManager:
 
 
 class KafkaConsumerManager:
-    async def start(self):
-        if not KAFKA_ENABLED:
-            logger.info("Kafka consumer disabled for topic %s", self.topic)
-            return
     def __init__(self, topic: str, group_id: str, callback: Callable):
         self.topic = topic
         self.group_id = group_id
@@ -113,6 +106,9 @@ class KafkaConsumerManager:
         self._task: Optional[asyncio.Task] = None
 
     async def start(self):
+        if not KAFKA_ENABLED:
+            logger.info("Kafka consumer disabled for topic %s", self.topic)
+            return
         self.consumer = AIOKafkaConsumer(
             self.topic,
             bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
