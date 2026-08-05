@@ -155,7 +155,8 @@ const getSocketBase = () => {
     return import.meta.env.VITE_API_URL.replace(/\/api\/v1$/, "");
   }
   const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:8005`;
+  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+  return isLocal ? `${protocol}//${hostname}:8005` : window.location.origin;
 };
 
 export default function App() {

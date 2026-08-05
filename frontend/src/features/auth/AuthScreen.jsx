@@ -247,6 +247,9 @@ export default function AuthScreen({
   const [googleSupportError, setGoogleSupportError] = useState("");
   const [timer, setTimer] = useState(0);
   const otpRefs = useRef([]);
+  const googleButtonRef = useRef(null);
+  const googleSubmitRef = useRef(onGoogleSubmit);
+  const rememberRef = useRef(remember);
 
   useEffect(() => {
     setStep(mode === "login" ? "login" : "register");
@@ -282,12 +285,33 @@ export default function AuthScreen({
   }, [step]);
 
   useEffect(() => {
+    googleSubmitRef.current = onGoogleSubmit;
+  }, [onGoogleSubmit]);
+
+  useEffect(() => {
+    rememberRef.current = remember;
+  }, [remember]);
+
+  useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
     if (!clientId) {
       setGoogleReady(false);
       setGoogleSupportError("Đặt VITE_GOOGLE_CLIENT_ID để bật Google Sign-In.");
-      return;
+      return undefined;
     }
+
+    const credentialHandler = async (response) => {
+      try {
+        if (!response?.credential) {
+          throw new Error("Google chưa trả về thông tin đăng nhập.");
+        }
+        await googleSubmitRef.current?.(response.credential, rememberRef.current);
+      } catch (err) {
+        setGoogleSupportError(err.message || "Không thể đăng nhập bằng Google.");
+      }
+    };
+
+    window.__finanzyGoogleCredentialHandler = credentialHandler;
 
     const initialize = () => {
       if (!window.google?.accounts?.id) {
@@ -296,53 +320,64 @@ export default function AuthScreen({
         return;
       }
 
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async (response) => {
-          try {
-            if (!response?.credential) {
-              throw new Error("Google chưa trả về thông tin đăng nhập.");
-            }
-            await onGoogleSubmit?.(response.credential, remember);
-          } catch (err) {
-            setGoogleSupportError(err.message || "Không thể đăng nhập bằng Google.");
-          }
-        },
-        auto_select: false,
-        cancel_on_tap_outside: false,
-      });
+      if (window.__finanzyGoogleClientId !== clientId) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response) => window.__finanzyGoogleCredentialHandler?.(response),
+          auto_select: false,
+          cancel_on_tap_outside: false,
+          use_fedcm_for_button: false,
+          locale: "vi",
+        });
+        window.__finanzyGoogleClientId = clientId;
+      }
+
       setGoogleReady(true);
       setGoogleSupportError("");
     };
 
     if (window.google?.accounts?.id) {
       initialize();
-      return;
+    } else {
+      const existing = document.getElementById("google-identity-script");
+      if (existing) {
+        existing.addEventListener("load", initialize, { once: true });
+      } else {
+        const script = document.createElement("script");
+        script.id = "google-identity-script";
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.addEventListener("load", initialize, { once: true });
+        script.onerror = () => {
+          setGoogleReady(false);
+          setGoogleSupportError("Không thể tải Google SDK.");
+        };
+        document.body.appendChild(script);
+      }
     }
 
-    const existing = document.getElementById("google-identity-script");
-    if (existing) {
-      existing.addEventListener("load", initialize);
-      return () => existing.removeEventListener("load", initialize);
-    }
-
-    const script = document.createElement("script");
-    script.id = "google-identity-script";
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = initialize;
-    script.onerror = () => {
-      setGoogleReady(false);
-      setGoogleSupportError("Không thể tải Google SDK.");
-    };
-    document.body.appendChild(script);
     return () => {
-      script.onload = null;
-      script.onerror = null;
+      if (window.__finanzyGoogleCredentialHandler === credentialHandler) {
+        window.__finanzyGoogleCredentialHandler = null;
+      }
     };
-  }, [onGoogleSubmit, remember]);
+  }, []);
 
+  useEffect(() => {
+    if (!googleReady || step !== "login" || !googleButtonRef.current) return;
+
+    googleButtonRef.current.replaceChildren();
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      logo_alignment: "left",
+      width: Math.min(400, googleButtonRef.current.clientWidth || 320),
+    });
+  }, [googleReady, step]);
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -662,21 +697,9 @@ export default function AuthScreen({
                   </div>
 
                   {/* Google button */}
-                  <button
-                    className="auth-btn-google"
-                    type="button"
-                    onClick={() => {
-                      if (!window.google?.accounts?.id) {
-                        setGoogleSupportError("Google SDK chưa sẵn sàng.");
-                        return;
-                      }
-                      window.google.accounts.id.prompt();
-                    }}
-                    disabled={loading || !googleReady}
-                  >
-                    <GoogleIcon />
-                    <span>{googleReady ? "Tiếp tục với Google" : "Đang chuẩn bị Google..."}</span>
-                  </button>
+                  <div className="auth-google-button" ref={googleButtonRef} aria-busy={!googleReady}>
+                    {!googleReady && "Đang chuẩn bị Google..."}
+                  </div>
                   {googleSupportError && <p className="auth-form-error">{googleSupportError}</p>}
 
                   {/* Security notice */}

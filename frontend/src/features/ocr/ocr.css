@@ -470,3 +470,44 @@ input:checked + .ocr-slider:before { transform: translateX(20px); }
   .ocr-grid-pro { grid-template-columns: 1fr; }
   .ocr-header-actions { display: none; }
 }
+
+/* Mobile 390px hardening */
+@media (max-width: 600px) {
+  .ocr-layout-wrap { width: 100%; max-width: 100%; min-width: 0; gap: 14px; padding: 14px 12px 112px; overflow-x: hidden; }
+  .ocr-header-pro, .ocr-grid-pro, .ocr-col-left, .ocr-col-right, .ocr-card-pro, .ocr-result-box, .ocr-section-pro, .ocr-footer-actions { width: 100%; max-width: 100%; min-width: 0; }
+  .ocr-header-pro { padding-right: 46px; }
+  .ocr-title-area h2 { font-size: 22px; }
+  .ocr-title-area p { font-size: 13px; line-height: 1.45; }
+  .ocr-close-btn-fixed { width: 36px; height: 36px; }
+  .ocr-grid-pro, .ocr-col-left, .ocr-col-right { gap: 14px; }
+  .ocr-card-pro, .ocr-result-box, .ocr-section-pro, .ocr-footer-actions { padding: 16px; border-radius: 16px; }
+  .ocr-upload-nav { overflow-x: auto; }
+  .ocr-upload-nav button { min-width: 0; padding: 9px 6px; font-size: 12px; }
+  .ocr-drop-area { padding: 28px 12px; }
+  .ocr-btn-select { max-width: 100%; white-space: normal; }
+  .ocr-preview-box { max-height: 430px; }
+  .ocr-res-item { gap: 12px; }
+  .ocr-res-item strong { min-width: 0; overflow-wrap: anywhere; }
+  .ocr-sec-title { margin-bottom: 16px; font-size: 16px; }
+  .ocr-field-row, .ocr-field-row.tri { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+  .ocr-field-row > *, .ocr-field-row > *[style] { grid-column: auto !important; min-width: 0; }
+  .ocr-input-wrap input, .ocr-input-wrap textarea, .ocr-search-bar input { min-width: 0; font-size: 16px; }
+  .ocr-input-wrap input { padding-right: 76px; }
+  .ocr-input-badge { right: 8px; padding: 3px 6px; font-size: 10px; }
+  .ocr-pill-group { align-items: stretch; flex-direction: column; gap: 8px; }
+  .ocr-pill-group span { min-width: 0; }
+  .ocr-pill-nav { width: 100%; overflow-x: auto; }
+  .ocr-pill-nav button { flex: 1 0 auto; white-space: nowrap; }
+  .ocr-ai-suggest { align-items: flex-start; }
+  .ocr-ai-suggest span { min-width: 0; overflow-wrap: anywhere; }
+  .ocr-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ocr-cat-card { min-width: 0; gap: 7px; padding: 8px; }
+  .ocr-cat-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ocr-footer-actions { align-items: stretch; flex-direction: column; gap: 16px; }
+  .ocr-toggle-create { align-items: flex-start; }
+  .ocr-toggle-create > div { min-width: 0; }
+  .ocr-toggle-create span { display: block; line-height: 1.4; }
+  .ocr-switch { flex: 0 0 44px; }
+  .ocr-footer-btns { width: 100%; flex-direction: column; gap: 8px; }
+  .ocr-btn-secondary, .ocr-btn-primary { width: 100%; max-width: 100%; padding: 12px 14px; white-space: normal; }
+}

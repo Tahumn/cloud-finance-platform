@@ -326,3 +326,31 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+
+/* Bills mobile 390px hardening */
+@media (max-width: 600px) {
+  .bill-page { width: 100%; max-width: 100%; min-width: 0; gap: 14px; padding: 14px 12px 112px !important; overflow-x: hidden; }
+  .bill-header, .bill-header-actions, .bill-main, .bill-table-card, .bill-detail-card { width: 100%; max-width: 100%; min-width: 0; }
+  .bill-header-text h1 { font-size: 22px; }
+  .bill-header-actions { display: grid !important; grid-template-columns: 1fr; }
+  .bill-btn { width: 100%; min-width: 0 !important; }
+  .bill-kpis { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .bill-kpi-card { min-width: 0; padding: 13px; }
+  .bill-kpi-content { min-width: 0; }
+  .bill-kpi-content strong { font-size: 20px; overflow-wrap: anywhere; }
+  .bill-toolbar { padding: 12px; }
+  .bill-filter { min-height: 42px; font-size: 16px; }
+  .bill-table-container { width: 100%; max-width: 100%; overflow-x: hidden !important; }
+  .bill-table { width: 100%; min-width: 0 !important; table-layout: fixed; }
+  .bill-table th, .bill-table td { padding: 10px 8px; overflow: hidden; text-overflow: ellipsis; }
+  .bill-table th:nth-child(3), .bill-table td:nth-child(3), .bill-table th:nth-child(4), .bill-table td:nth-child(4), .bill-table th:nth-child(6), .bill-table td:nth-child(6), .bill-table th:nth-child(7), .bill-table td:nth-child(7) { display: none; }
+  .bill-table th:nth-child(1), .bill-table td:nth-child(1) { width: 46%; }
+  .bill-table th:nth-child(2), .bill-table td:nth-child(2) { width: 26%; }
+  .bill-table th:nth-child(5), .bill-table td:nth-child(5) { width: 28%; text-align: right; }
+  .bill-detail-header, .bill-detail-body, .bill-detail-actions { padding: 16px; }
+  .bill-info-row { align-items: flex-start; gap: 12px; }
+  .bill-info-value { min-width: 0; overflow-wrap: anywhere; }
+  .bill-edit-row-2 { grid-template-columns: 1fr !important; }
+  .bill-modal-overlay { padding: 12px; }
+  .bill-modal-content { max-width: 100%; max-height: calc(100dvh - 24px); }
+}
