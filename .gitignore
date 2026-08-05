@@ -66,3 +66,8 @@ frontend/.env.local
 frontend/.env.*.local
 
 ecs/local-env/
+
+# Generated AWS CLI deployment files
+/ecs/*.json
+/ecs-secrets-policy.json
+/ecs-tasks-trust-policy.json
