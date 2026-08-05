@@ -9,9 +9,18 @@ from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 logger = logging.getLogger(__name__)
 
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
-
+KAFKA_ENABLED = os.getenv("KAFKA_ENABLED", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 class KafkaProducerManager:
+    async def start(self):
+        if not KAFKA_ENABLED:
+            logger.info("Kafka producer disabled")
+            return
     _instance: Optional["KafkaProducerManager"] = None
 
     def __init__(self):
@@ -92,6 +101,10 @@ class KafkaProducerManager:
 
 
 class KafkaConsumerManager:
+    async def start(self):
+        if not KAFKA_ENABLED:
+            logger.info("Kafka consumer disabled for topic %s", self.topic)
+            return
     def __init__(self, topic: str, group_id: str, callback: Callable):
         self.topic = topic
         self.group_id = group_id
