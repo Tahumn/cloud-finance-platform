@@ -1,10 +1,9 @@
 const inferApiBase = () => {
   if (import.meta.env.VITE_API_BASE) return import.meta.env.VITE_API_BASE;
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  // Works for local dev and phone testing on LAN:
-  // If frontend is opened at http://192.168.1.10:5173, default API becomes http://192.168.1.10:8005/api/v1
   const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:8005/api/v1`;
+  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+  return isLocal ? `${protocol}//${hostname}:8005/api/v1` : "/api/v1";
 };
 
 const API_BASE = inferApiBase();
@@ -43,7 +42,9 @@ export const clearToken = () => {
 };
 
 function buildFetchHint() {
-  return `Failed to fetch. Khong ket noi duoc API (${API_BASE}). Hay chac chan backend dang chay (vi du: docker compose --profile micro up -d).`;
+  return import.meta.env.PROD
+    ? `Failed to fetch. Khong ket noi duoc API (${API_BASE}). Vui long thu tai lai trang hoac kiem tra dich vu AWS.`
+    : `Failed to fetch. Khong ket noi duoc API (${API_BASE}). Hay chac chan backend dang chay (vi du: docker compose --profile micro up -d).`;
 }
 
 export async function request(path, options = {}) {
