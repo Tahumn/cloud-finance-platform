@@ -19,7 +19,12 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip \
     && pip install -r /app/requirements.txt
 
-COPY app /app/app
+COPY app/__init__.py /app/app/__init__.py
+COPY app/database.py /app/app/database.py
+COPY app/core /app/app/core
+COPY app/ocr /app/app/ocr
+COPY app/services/ocr_main.py /app/app/services/ocr_main.py
+
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
 

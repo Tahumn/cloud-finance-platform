@@ -6,20 +6,17 @@ ENV PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# CĂ i dependency há»‡ thá»‘ng trÆ°á»›c Ä‘á»ƒ táº­n dá»¥ng Docker cache
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        tesseract-ocr \
-        tesseract-ocr-vie \
-        libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt /app/requirements.txt
 
 RUN pip install --upgrade pip \
     && pip install -r /app/requirements.txt
 
-COPY app /app/app
+COPY app/__init__.py /app/app/__init__.py
+COPY app/database.py /app/app/database.py
+COPY app/core /app/app/core
+COPY app/planning /app/app/planning
+COPY app/services/planning_main.py /app/app/services/planning_main.py
+
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
 
