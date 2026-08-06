@@ -21,20 +21,20 @@ The original picture is visually organized, but it mixes the current implementat
 
 ## Deployable target
 
-1. Route 53 resolves the application domain to CloudFront.
+1. The demo uses the generated CloudFront domain directly. Route 53 is optional when a custom domain is added.
 2. AWS WAF protects CloudFront.
 3. CloudFront uses two origins:
    - private S3 bucket through Origin Access Control for the SPA;
    - public ALB for `/api/*` and `/ws/*` behaviors.
 4. ALB forwards only to the ECS Gateway service. Other ECS services remain private and are resolved by Cloud Map.
 5. ECS tasks run in private application subnets across at least two Availability Zones. NAT gateways or VPC endpoints provide ECR, Secrets Manager, CloudWatch, and external LLM access.
-6. PostgreSQL and Redis run in private data subnets. Security groups allow database access only from the relevant ECS service security groups.
-7. Receipt images and exported files move from local `/uploads` to a private S3 bucket. The OCR container reads/writes objects through an ECS task role.
+6. PostgreSQL and Redis run in private data subnets. The demo currently uses Single-AZ RDS and a single Redis primary; production should enable Multi-AZ and automatic failover. Security groups allow access only from ECS.
+7. A private S3 receipts/exports bucket is provisioned, but the current OCR code still uses local file handling. S3 application integration through an ECS task role remains pending.
 8. GitHub Actions authenticates to AWS with OIDC, pushes images to ECR, and deploys ECS services.
 
 ## Database decision
 
-For an MVP, use one Multi-AZ RDS PostgreSQL deployment with separate databases or schemas and separate credentials per service. The existing environment already exposes separate `*_DB_URL` values, so services remain logically isolated. For strict blast-radius, scaling, or compliance requirements, split high-value domains into separate RDS deployments later.
+The current demo uses one Single-AZ RDS PostgreSQL instance with separate logical databases and credentials per service. For production, upgrade the shared instance to Multi-AZ. The existing environment already exposes separate `*_DB_URL` values, so services remain logically isolated. For strict blast-radius, scaling, or compliance requirements, split high-value domains into separate RDS deployments later.
 
 ## Kafka decision
 
@@ -42,11 +42,11 @@ Kafka is present in Compose and Finance/Planning contain producer/consumer hooks
 
 ## Required code/deployment work before AWS
 
-- Replace filesystem uploads with S3 object storage.
+- Integrate the provisioned private S3 receipts bucket and replace local filesystem uploads.
 - Add ECS task definitions, health checks, Cloud Map names, IAM task roles, and autoscaling policies.
 - Add infrastructure as code for VPC, subnets, ALB, ECS, RDS, Redis, CloudFront, WAF, S3, ECR, CloudWatch, KMS, and Secrets Manager.
 - Replace static service URLs with Cloud Map DNS names.
-- Replace SMTP credentials with SES or keep the external SMTP provider explicitly.
+- The application currently reaches Amazon SES through its SMTP endpoint over TLS; keep the credentials in Secrets Manager and complete SES production-access requirements.
 - Configure CloudFront behaviors to disable caching for API and WebSocket paths.
 - Store secrets outside `.env`; rotate the exposed AI API credential.
 - Add database migrations as a controlled deployment step.

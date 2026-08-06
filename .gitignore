@@ -1,73 +1,47 @@
 # Python
 .venv/
 __pycache__/
-*.pyc
-*.pyo
-
-# Env
-.env
-
-# Test
+*.py[cod]
 .pytest_cache/
 
-# IDE
-.vscode/
-
-# Codex / local agent artifacts
-.agent/
-.codex
-.codex/
-
-# Local scratch kits
-temp-kit/
-
-# Vite cache
-frontend/.vite/
-
-# Docker volumes
-data/
-# Node
-node_modules/
-npm-debug.log*
-
-# Expo
-.expo/
-.expo-shared/
-
-# Build
-dist/
-build/
-
-# Environment
-.env
-.env.example/
-
-# Temporary development files
-TransactionsScreen_local.jsx
-TransactionsScreen_local_utf8.jsx
-TransactionsScreen_remote.jsx
-TransactionsScreen_remote_utf8.jsx
-diff.txt
-docker-compose (1).yml
-phan_cong_copy.docx
-scratch/
-
-# Runtime uploads
-uploads/*
-!uploads/.gitkeep
-
-# Local environment files
+# Environment and secrets
 .env
 .env.*
 !.env.example
-
+frontend/.env
 frontend/.env.production
 frontend/.env.local
 frontend/.env.*.local
 
-ecs/local-env/
+# Node / frontend
+node_modules/
+npm-debug.log*
+.expo/
+.expo-shared/
+frontend/.vite/
+dist/
+build/
 
-# Generated AWS CLI deployment files
+# IDE and local agents
+.vscode/
+.agent/
+.codex/
+
+# Runtime data
+uploads/*
+!uploads/.gitkeep
+
+# Local scratch and generated deployment files
+scratch/
+temp-kit/
+ecs/local-env/
 /ecs/*.json
 /ecs-secrets-policy.json
 /ecs-tasks-trust-policy.json
+
+# Temporary comparison files
+TransactionsScreen_local*.jsx
+TransactionsScreen_remote*.jsx
+diff.txt
+docker-compose (1).yml
+phan_cong_copy.docx

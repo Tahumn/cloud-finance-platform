@@ -58,8 +58,8 @@ Users
                      Recurring, Notifications và Worker
                       -> RDS PostgreSQL
                       -> ElastiCache for Redis / RQ
-                      -> S3 receipts
-                      -> Amazon SES
+                      -> S3 receipts bucket (integration pending)
+                      -> Amazon SES through SMTP/TLS
                       -> Gemini API qua NAT Gateway
 ```
 
@@ -68,7 +68,7 @@ Users
 - ECS tasks chạy trong private application subnets trên hai Availability Zone.
 - Service-to-service sử dụng ECS Service Connect và AWS Cloud Map.
 - PostgreSQL dùng các logical database riêng theo domain trên một RDS instance dùng chung.
-- Redis dùng cho cache, RQ và Pub/Sub.
+- Redis dùng cho cache, RQ và Pub/Sub; môi trường demo hiện có một primary và chưa bật automatic failover.
 - Secrets Manager/KMS quản lý cấu hình nhạy cảm; CloudWatch lưu logs và metrics.
 - Môi trường demo hiện ưu tiên chi phí. RDS có thể chạy Single-AZ; production nên dùng Multi-AZ, NAT Gateway theo AZ, autoscaling, backup và deletion protection.
 
@@ -218,7 +218,7 @@ Các tài nguyên thường phát sinh phí khi đang tồn tại hoặc hoạt 
 
 - ECS, RDS và Redis không mở trực tiếp ra Internet.
 - Security Group chỉ cho phép ALB → ECS `8000`, ECS → RDS `5432`, ECS → Redis `6379` và ECS ↔ ECS `8000`.
-- S3 frontend và receipts là private; CloudFront truy cập frontend qua OAC.
+- S3 frontend và receipts là private; CloudFront truy cập frontend qua OAC. Bucket receipts đã được tạo nhưng tích hợp upload từ OCR vẫn đang chờ hoàn thiện.
 - Secret được inject vào task lúc khởi động từ AWS Secrets Manager.
 - Database không có public access; traffic nội bộ dùng private subnet.
 - CI/CD sử dụng GitHub OIDC và IAM role có quyền giới hạn.
@@ -227,7 +227,7 @@ Các tài nguyên thường phát sinh phí khi đang tồn tại hoặc hoạt 
 
 | Đăng nhập | Tổng quan |
 | --- | --- |
-| ![Đăng nhập](assets/screenshots/DangNhap/login.jpg) | ![Tổng quan](assets/screenshots/TongQuan/z7833359348131_a099ed31903aead0649e80b829db80eb.jpg) |
+| ![Đăng nhập](assets/screenshots/DangNhap/login.png) | ![Tổng quan](assets/screenshots/TongQuan/z7833359348131_a099ed31903aead0649e80b829db80eb.jpg) |
 
 | Giao dịch | OCR hóa đơn |
 | --- | --- |
