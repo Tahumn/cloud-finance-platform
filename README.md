@@ -233,18 +233,6 @@ Các tài nguyên thường phát sinh phí khi đang tồn tại hoặc hoạt 
 | --- | --- |
 | ![Giao dịch](assets/screenshots/GiaoDich/z7833421295700_ea70996a9b223f0efac685f4fa280755.jpg) | ![OCR](assets/screenshots/OCR/z7833426318618_dcab1d430153b34e357b35a2495c0529.jpg) |
 
-## Thành viên
-
-Nhóm sinh viên lớp DCT122C5 — Trường Đại học Sài Gòn.
-
-| Thành viên | GitHub |
-| --- | --- |
-| Võ Kiều Anh | [KieuAnh2204](https://github.com/KieuAnh2204) |
-| Nguyễn Thành Hưng | [thungnguyen](https://github.com/thungnguyen) |
-| Đặng Nguyễn Tâm Như | [Tahumn](https://github.com/Tahumn) |
-| Phạm Nguyễn Minh Châu | [mmchouuu](https://github.com/mmchouuu) |
-
-Giảng viên hướng dẫn: **TS. Đỗ Như Tài**.
 
 ## License
 
