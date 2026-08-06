@@ -63,15 +63,28 @@ jobs:
             family="cloud-finance-$name"
             service="cloud-finance-$name"
 
+            case "$name" in
+              gateway) command='["uvicorn","app.gateway_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              auth) command='["uvicorn","app.services.auth_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              finance) command='["uvicorn","app.services.finance_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              notifications) command='["uvicorn","app.services.notifications_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              notifications-worker) command='["python","-m","app.workers.notifications_worker"]' ;;
+              planning) command='["uvicorn","app.services.planning_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              recurring) command='["uvicorn","app.services.recurring_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              ocr) command='["uvicorn","app.services.ocr_main:app","--host","0.0.0.0","--port","8000"]' ;;
+              ai) command='["uvicorn","app.services.ai_main:app","--host","0.0.0.0","--port","8000"]' ;;
+            esac
             aws ecs describe-task-definition \
               --task-definition "$family" \
               --region "$AWS_REGION" \
               --query taskDefinition \
               > current-task.json
 
-            jq --arg image "$IMAGE_URI" --arg container "$name" '
+            jq --arg image "$IMAGE_URI" --arg container "$name" --argjson command "$command" '
               .containerDefinitions |= map(
-                if .name == $container then .image = $image else . end
+                if .name == $container then
+                  .image = $image | .command = $command
+                else . end
               )
               | del(
                   .taskDefinitionArn,
